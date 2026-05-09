@@ -10,8 +10,12 @@
     "package": "plasmo package"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@plasmohq/storage": "^1.15.0",
     "plasmo": "0.90.5",
+=======
+    "plasmo": "^0.90.5",
+>>>>>>> a2a35d46fe94b3f439853c35e6573f2d7b436ebc
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
@@ -21,7 +25,10 @@
     "@types/node": "20.11.5",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.14",
     "prettier": "3.2.4",
+    "tailwindcss": "^3.4.19",
     "typescript": "5.3.3"
   },
   "manifest": {
