@@ -1,14 +1,6 @@
-<<<<<<< HEAD
 import { useState, useEffect, useRef } from "react"
 
 const STORAGE_KEY = "focusbuddy_timer"
-=======
-import "./style.css"
-
-import { useState } from "react"
-
-const API_BASE = "http://localhost:8000" // Updated to match backend port
->>>>>>> a2a35d46fe94b3f439853c35e6573f2d7b436ebc
 
 const QUEST_TAGS = [
   { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
@@ -95,7 +87,6 @@ function heatColor(cell, maxTotal) {
 // ---- Components ----
 function Sparkle({ x, y }) {
   return (
-<<<<<<< HEAD
     <div style={{
       position: "absolute", left: x, top: y, pointerEvents: "none", fontSize: 18,
       animation: "sparklePop 700ms ease-out forwards"
@@ -138,45 +129,10 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
         <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{primaryLabel}</div>
         <div style={{ fontSize: 9, opacity: 0.6, marginTop: 3, textAlign: "center", padding: "0 10px" }}>{subLabel}</div>
       </div>
-=======
-    <div className="p-4 min-w-[320px] font-sans">
-      <h1 className="text-red-500 text-lg font-semibold mb-2">
-        Backend connection test
-      </h1>
-
-      <button
-        onClick={testBackend}
-        className="mb-3 px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
-        Test backend
-      </button>
-
-      <section className="mb-4">
-        <h3 className="my-2 font-medium">GET /</h3>
-        {rootError ? (
-          <pre className="text-red-700">Error: {rootError}</pre>
-        ) : root ? (
-          <pre>{JSON.stringify(root, null, 2)}</pre>
-        ) : (
-          <p></p>
-        )}
-      </section>
-
-      <section>
-        <h3 className="my-2 font-medium">GET /users</h3>
-        {usersError ? (
-          <pre className="text-red-700">Error: {usersError}</pre>
-        ) : users ? (
-          <pre>{JSON.stringify(users, null, 2)}</pre>
-        ) : (
-          <p></p>
-        )}
-      </section>
->>>>>>> a2a35d46fe94b3f439853c35e6573f2d7b436ebc
     </div>
   )
 }
 
-<<<<<<< HEAD
 function HeatMap({ data }) {
   const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
   const HOURS = 24, BUCKETS = 12
@@ -815,6 +771,3 @@ function controlBtn(bg, color = "white") {
 }
 
 export default IndexPopup
-=======
-export default IndexPopup
->>>>>>> a2a35d46fe94b3f439853c35e6573f2d7b436ebc
