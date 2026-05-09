@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-const API_BASE = "http://localhost:1815" // Updated to match backend port
+const API_BASE = "http://localhost:8000" // Updated to match backend port
 
 function IndexPopup() {
   // Just to test the backend
