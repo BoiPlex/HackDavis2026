@@ -1,3 +1,5 @@
+import "./style.css"
+
 import { useState } from "react"
 
 const API_BASE = "http://localhost:8000" // Updated to match backend port
@@ -33,17 +35,21 @@ function IndexPopup() {
   }
 
   return (
-    <div style={{ padding: 16, minWidth: 320, fontFamily: "sans-serif" }}>
-      <h2>Backend connection test</h2>
+    <div className="p-4 min-w-[320px] font-sans">
+      <h1 className="text-red-500 text-lg font-semibold mb-2">
+        Backend connection test
+      </h1>
 
-      <button onClick={testBackend} style={{ marginBottom: 12 }}>
+      <button
+        onClick={testBackend}
+        className="mb-3 px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
         Test backend
       </button>
 
-      <section style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: "8px 0" }}>GET /</h3>
+      <section className="mb-4">
+        <h3 className="my-2 font-medium">GET /</h3>
         {rootError ? (
-          <pre style={{ color: "crimson" }}>Error: {rootError}</pre>
+          <pre className="text-red-700">Error: {rootError}</pre>
         ) : root ? (
           <pre>{JSON.stringify(root, null, 2)}</pre>
         ) : (
@@ -52,9 +58,9 @@ function IndexPopup() {
       </section>
 
       <section>
-        <h3 style={{ margin: "8px 0" }}>GET /users</h3>
+        <h3 className="my-2 font-medium">GET /users</h3>
         {usersError ? (
-          <pre style={{ color: "crimson" }}>Error: {usersError}</pre>
+          <pre className="text-red-700">Error: {usersError}</pre>
         ) : users ? (
           <pre>{JSON.stringify(users, null, 2)}</pre>
         ) : (
