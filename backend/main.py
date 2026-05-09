@@ -1,17 +1,22 @@
 from fastapi import FastAPI
-from fastapi.websockets import WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from db import db
+from pydantic import BaseModel
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Connected!"}
 
-
-@app.websocket("/")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        await websocket.send_text(f"Message text was: {data}")
+@app.get("/users")
+async def get_users():
+    users = await db.users.find().to_list(length=100)
+    return {"users": users}
