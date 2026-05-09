@@ -3,3 +3,4 @@ motor
 uvicorn[standard]
 python-dotenv
 pymongo[srv]
+backboard-sdk
