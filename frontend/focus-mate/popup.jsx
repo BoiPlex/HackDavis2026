@@ -1,20 +1,25 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 const API_BASE = "http://localhost:1815" // Updated to match backend port
 
 function IndexPopup() {
   // Just to test the backend
-  const [root, setRoot] = useState<unknown>(null) // Root call
-  const [users, setUsers] = useState<unknown>(null) // List users call
-  const [error, setError] = useState<string | null>(null) // Error
+  const [root, setRoot] = useState(null) // Root call
+  const [users, setUsers] = useState(null) // List users call
+  const [rootError, setRootError] = useState(null)
+  const [usersError, setUsersError] = useState(null)
 
   const testBackend = async () => {
+    setRootError(null)
+    setUsersError(null)
+
     try {
       const r = await fetch(`${API_BASE}/`)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setRoot(await r.json())
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setRoot(null)
+      setRootError(e instanceof Error ? e.message : String(e))
     }
 
     try {
@@ -22,7 +27,8 @@ function IndexPopup() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setUsers(await r.json())
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setUsers(null)
+      setUsersError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -36,8 +42,8 @@ function IndexPopup() {
 
       <section style={{ marginBottom: 16 }}>
         <h3 style={{ margin: "8px 0" }}>GET /</h3>
-        {error ? (
-          <pre style={{ color: "crimson" }}>Error: {error}</pre>
+        {rootError ? (
+          <pre style={{ color: "crimson" }}>Error: {rootError}</pre>
         ) : root ? (
           <pre>{JSON.stringify(root, null, 2)}</pre>
         ) : (
@@ -47,8 +53,8 @@ function IndexPopup() {
 
       <section>
         <h3 style={{ margin: "8px 0" }}>GET /users</h3>
-        {error ? (
-          <pre style={{ color: "crimson" }}>Error: {error}</pre>
+        {usersError ? (
+          <pre style={{ color: "crimson" }}>Error: {usersError}</pre>
         ) : users ? (
           <pre>{JSON.stringify(users, null, 2)}</pre>
         ) : (
