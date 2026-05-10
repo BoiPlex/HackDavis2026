@@ -664,14 +664,8 @@ function IndexPopup() {
                     <input type="checkbox" checked={t.contributing}
                       onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                     <div className="flex-1 overflow-hidden">
-<<<<<<< HEAD
-                      <div className="truncate font-semibold">{t.title}</div>
-                      <div className="text-sm opacity-60 flex gap-1.5">
-                        <span>{t.url}</span><span>·</span>
-=======
                       <div className="truncate font-semibold">{t.domain}</div>
                       <div className="text-[9px] opacity-60 flex gap-1.5">
->>>>>>> 396acfdd4de402c084ac04f697afa69e0ca0582c
                         <span>{t.visits} visits</span><span>·</span>
                         <span>{formatTime(t.secondsOn)}</span>
                       </div>
@@ -689,14 +683,8 @@ function IndexPopup() {
                         <input type="checkbox" checked={t.contributing}
                           onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                         <div className="flex-1 overflow-hidden">
-<<<<<<< HEAD
-                          <div className="truncate">{t.title}</div>
-                          <div className="text-sm opacity-60 flex gap-1.5">
-                            <span>{t.url}</span><span>·</span>
-=======
                           <div className="truncate">{t.domain}</div>
                           <div className="text-[9px] opacity-60 flex gap-1.5">
->>>>>>> 396acfdd4de402c084ac04f697afa69e0ca0582c
                             <span>{t.visits} visits</span><span>·</span>
                             <span>{formatTime(t.secondsOn)}</span>
                           </div>
