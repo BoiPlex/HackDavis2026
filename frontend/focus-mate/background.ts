@@ -3,7 +3,7 @@ export {}
 
 const SNAPSHOT_ALARM = "focus-mate-snapshot"
 const SNAPSHOT_PERIOD_MINUTES = 1
-const IDLE_THRESHOLD_SECONDS = 15
+const IDLE_THRESHOLD_SECONDS = 60
 const INPUT_KEY_PREFIX = "tab-input:"
 const USER_ID_KEY = "user-id"
 const BACKEND_URL = "http://localhost:8000"
