@@ -6,9 +6,9 @@ const THEME_KEY = "flowstate_theme"
 const MICRO_GOAL_KEY = "flowstate_micro_goal"
 
 const QUEST_TAGS = [
-  { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
-  { id: "work",      label: "💼 Work",       color: "#34D399" },
-  { id: "sidequest", label: "🐇 Side Quest", color: "#EF4444" }
+  { id: "research", label: "🔍 Research", color: "#7C5CFF" },
+  { id: "work", label: "💼 Work", color: "#34D399" },
+  { id: "sidequest", label: "🐇 Distractions", color: "#EF4444" }
 ]
 
 const MICRO_GOALS = [
@@ -627,7 +627,7 @@ function IndexPopup() {
     phase === "break" ? "Break" : "Done"
   const ringSub =
     phase === "idle"
-      ? (isSideQuest ? `${localWorkMins}m · no break` : `${localWorkMins}m focus · ${localBreakMins}m break`)
+      ? (isSideQuest ? `${localWorkMins}m · no break` : `then ${localBreakMins}m break`)
       : phase === "work"  ? (timer?.hasBreak && timer?.breakSecs > 0 ? `then ${Math.round(timer.breakSecs/60)}m break` : "no break this round")
       : phase === "break" ? "rest your brain"
       : "🎉 nice work"
@@ -807,7 +807,7 @@ function IndexPopup() {
           <div className="flex flex-col gap-2 min-h-0">
             <div className="card shrink-0 !py-3 !px-3">
               <div className="text-sm font-bold opacity-[0.55] mb-6 tracking-[1.5px]">
-                STEP 1 · CHOOSE YOUR QUEST
+                1 · CHOOSE YOUR QUEST
               </div>
               <div className="flex flex-wrap gap-[5px]">
                 {QUEST_TAGS.map((q) => {
@@ -825,7 +825,7 @@ function IndexPopup() {
               </div>
               {isSideQuest && (
                 <div className="text-sm opacity-70 mt-[5px] italic">
-                  Side Quests are stimulation, not failure — running without a break.
+                  Distrations are stimulation, not failure — running without a break.
                 </div>
               )}
             </div>
@@ -833,12 +833,12 @@ function IndexPopup() {
             <div className="card flex-1 flex flex-col min-h-0 py-6">
               <div className="flex justify-between items-center">
                 <div className="text-sm font-bold opacity-[0.65] tracking-[1px]">
-                  STEP 2 · 🧭 GOAL MAP
+                  2 · 🧭 GOAL MAP
                 </div>
-                <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
+                {/* <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
                   className={`border-0 px-2 py-[3px] rounded-full text-white text-xs font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   🔥 Brain Dump ({sideQuestTabs.length})
-                </button>
+                </button> */}
               </div>
 
               <div className="flex gap-[5px] my-6 shrink-0">
@@ -855,11 +855,11 @@ function IndexPopup() {
 
               <div className="scroll-y flex-1 min-h-0 pr-1">
                 <div className="text-sm font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
-                  ✓ ON THE TRAIL · {formatTime(totalContributingSecs)} invested
+                  ✓ PRODUCTIVE TABS · {formatTime(totalContributingSecs)} invested
                 </div>
                 {contributingTabs.length === 0 && (
                   <div className="text-sm opacity-50 italic pt-[3px] pb-1.5">
-                    No quest tabs yet. Add one above to unlock the timer.
+                    No productive tabs yet. Add one to unlock the timer.
                   </div>
                 )}
                 {contributingTabs.map((t) => (
@@ -880,7 +880,7 @@ function IndexPopup() {
                 {sideQuestTabs.length > 0 && (
                   <>
                     <div className="text-sm font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-[0.5px]">
-                      🐇 SIDE QUESTS · stimulation, not failure
+                      🐇 DISTRACTIONS · stimulation, not failure
                     </div>
                     {sideQuestTabs.map((t) => (
                       <div key={t.id} className="tab-row tab-side">
@@ -921,7 +921,7 @@ function IndexPopup() {
 
               <div className="mt-1">
                 <div className="text-sm font-bold opacity-[0.55] mb-6 tracking-[1.5px] text-center">
-                  STEP 3 · MICRO-GOAL{isSideQuest ? " (no break)" : ""}
+                  3 · MICRO-GOAL{isSideQuest ? " (no break)" : ""}
                 </div>
                 {/* 4-col tracking grid lets the 4 micro-goals form a 2×2,
     while the custom button sits centered (col-start-2 col-span-2)
