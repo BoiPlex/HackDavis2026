@@ -308,7 +308,14 @@ const drainInputCounters = async () => {
   )
   console.log("[focus-mate] drain start", {
     inputKeysFound: inputKeys,
-    tabsTracked: Array.from(tabs.keys())
+    activeTabId,
+    activeTabUrl:
+      activeTabId !== null ? tabs.get(activeTabId)?.url : undefined,
+    tabsTracked: Array.from(tabs.values()).map((t) => ({
+      id: t.tabId,
+      url: t.url,
+      isActive: t.isActive
+    }))
   })
   for (const key of inputKeys) {
     const tabId = Number(key.slice(INPUT_KEY_PREFIX.length))
@@ -507,6 +514,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const id = sender.tab?.id ?? null
   console.log("[focus-mate] claim-tab", { id, url: sender.tab?.url })
   sendResponse(id)
+})
+
+// Live write visibility — fires the moment a tracker pushes new counters.
+// Without this we only learn at drain time (every 60s) whether trackers
+// are alive, making flaky-tracker bugs hard to confirm.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return
+  for (const key of Object.keys(changes)) {
+    if (!key.startsWith(INPUT_KEY_PREFIX)) continue
+    const tabId = Number(key.slice(INPUT_KEY_PREFIX.length))
+    const cur = changes[key].newValue as StoredInput | undefined
+    const tab = tabs.get(tabId)
+    console.log("[focus-mate] tab-input write", {
+      key,
+      tabId,
+      knownToSW: !!tab,
+      url: tab?.url ?? cur?.url,
+      cur
+    })
+  }
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {

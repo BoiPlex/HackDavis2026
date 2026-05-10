@@ -4,7 +4,8 @@
       "PowerShell($PWD.Path)",
       "Bash(pnpm build *)",
       "Bash(ls \"C:/Users/endpl/.claude/projects/c--Users-endpl-OneDrive-Desktop-Projects-HackDavis2026/memory/\")",
-      "Read(//c/Users/endpl/.claude/projects/c--Users-endpl-OneDrive-Desktop-Projects-HackDavis2026/memory/**)"
+      "Read(//c/Users/endpl/.claude/projects/c--Users-endpl-OneDrive-Desktop-Projects-HackDavis2026/memory/**)",
+      "Bash(npm run *)"
     ]
   }
 }
