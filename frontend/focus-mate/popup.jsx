@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import "./style.css" // tailwind entrypoint
 
+const STORAGE_KEY = "focusbuddy_timer"
 const THEME_KEY = "flowstate_theme"
 const MICRO_GOAL_KEY = "flowstate_micro_goal"
 
@@ -48,43 +49,6 @@ async function writeStore(s) {
     if (s === null) localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
-}
-
-// Send popup state to background script for persistence
-const sendStateToBackground = async (state) => {
-  if (hasChrome && chrome.runtime?.sendMessage) {
-    try {
-      await chrome.runtime.sendMessage({
-        type: "update-popup-state",
-        state: {
-          activeQuest: state.activeQuest,
-          goal: state.goal,
-          isCustom: state.isCustom,
-          customWork: state.customWork,
-          customBreak: state.customBreak,
-          tabs: state.tabs,
-          newDomain: state.newDomain,
-          savedCount: state.savedCount
-        }
-      })
-    } catch (e) {
-      console.warn("Failed to send state to background:", e)
-    }
-  }
-}
-
-// Request popup state from background script
-const requestStateFromBackground = async () => {
-  if (hasChrome && chrome.runtime?.sendMessage) {
-    try {
-      const response = await chrome.runtime.sendMessage({ type: "get-popup-state" })
-      return response?.state || null
-    } catch (e) {
-      console.warn("Failed to request state from background:", e)
-      return null
-    }
-  }
-  return null
 }
 async function readTheme() {
   if (hasChrome) {
@@ -386,23 +350,6 @@ function IndexPopup() {
     readTheme().then((savedTheme) => {
       if (mounted) setTheme(savedTheme === "dark" ? "dark" : "light")
     })
-<<<<<<< HEAD
-
-    // Load popup state from background
-    requestStateFromBackground().then((popupState) => {
-      if (mounted && popupState) {
-        if (popupState.activeQuest) setActiveQuest(popupState.activeQuest)
-        if (popupState.goal) setGoal(popupState.goal)
-        setIsCustom(popupState.isCustom || false)
-        setCustomWork(popupState.customWork || 20)
-        setCustomBreak(popupState.customBreak || 7)
-        if (popupState.tabs) setTabs(popupState.tabs)
-        setNewDomain(popupState.newDomain || "")
-        setSavedCount(popupState.savedCount || 0)
-      }
-    })
-
-=======
     readMicroGoal().then((savedGoal) => {
       if (!mounted || !savedGoal) return
       if (savedGoal.isCustom) {
@@ -417,7 +364,6 @@ function IndexPopup() {
         setIsCustom(false)
       }
     })
->>>>>>> 0d34a43d85c029af19eeda1c972cd490b242db38
     const sync = async () => {
       const s = await readStore()
       if (!mounted) return
@@ -576,20 +522,6 @@ function IndexPopup() {
       return () => clearTimeout(t)
     }
   }, [tabs, timer])
-
-  // Send state updates to background for persistence
-  useEffect(() => {
-    sendStateToBackground({
-      activeQuest,
-      goal,
-      isCustom,
-      customWork,
-      customBreak,
-      tabs,
-      newDomain,
-      savedCount
-    })
-  }, [activeQuest, goal, isCustom, customWork, customBreak, tabs, newDomain, savedCount])
 
   const triggerReward = (e) => {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -905,7 +837,7 @@ function IndexPopup() {
                 </div>
                 <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
                   className={`border-0 px-2 py-[3px] rounded-full text-white text-xs font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
-                  Side Quests ({sideQuestTabs.length})
+                  🔥 Brain Dump ({sideQuestTabs.length})
                 </button>
               </div>
 
@@ -923,11 +855,11 @@ function IndexPopup() {
 
               <div className="scroll-y flex-1 min-h-0 pr-1">
                 <div className="text-sm font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
-                  ✓ ON TRACK · {formatTime(totalContributingSecs)} invested
+                  ✓ ON THE TRAIL · {formatTime(totalContributingSecs)} invested
                 </div>
                 {contributingTabs.length === 0 && (
                   <div className="text-sm opacity-50 italic pt-[3px] pb-1.5">
-                    No tabs yet. Add one above to unlock the timer.
+                    No quest tabs yet. Add one above to unlock the timer.
                   </div>
                 )}
                 {contributingTabs.map((t) => (

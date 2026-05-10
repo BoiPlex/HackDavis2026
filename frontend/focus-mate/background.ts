@@ -18,39 +18,6 @@ type StoredInput = {
   lastUpdate?: number
 }
 
-type QuestTag = {
-  id: string
-  label: string
-  color: string
-}
-
-type MicroGoal = {
-  mins: number
-  break: number
-  label: string
-}
-
-type TabEntry = {
-  id: number
-  title: string
-  url: string
-  contributing: boolean
-  visits: number
-  secondsOn: number
-  friction: number
-}
-
-type PopupState = {
-  activeQuest: QuestTag | null
-  goal: MicroGoal
-  isCustom: boolean
-  customWork: number
-  customBreak: number
-  tabs: TabEntry[]
-  newDomain: string
-  savedCount: number
-}
-
 // URLs and page titles are intentionally NOT stored on TabMetric — they are
 // PII (browsing history). Domain alone is retained because aggregating by
 // host (e.g. github.com vs reddit.com) is what the product surfaces, and
@@ -99,16 +66,6 @@ const windowMetrics: WindowMetrics = {
   keystrokeCount: 0,
   scrollDelta: 0,
   cursorDelta: 0
-}
-let popupState: PopupState = {
-  activeQuest: null,
-  goal: { mins: 15, break: 5, label: "Quick Quest" },
-  isCustom: false,
-  customWork: 20,
-  customBreak: 7,
-  tabs: [],
-  newDomain: "",
-  savedCount: 0
 }
 let activeTabId: number | null = null
 let idleState: chrome.idle.IdleState = "active"
@@ -185,7 +142,6 @@ type PersistedState = {
   windowMetrics: WindowMetrics
   tabs: TabMetric[]
   lastSeenInput: Array<[number, StoredInput]>
-  popupState: PopupState
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null
@@ -194,8 +150,7 @@ const persistState = async () => {
   const payload: PersistedState = {
     windowMetrics: { ...windowMetrics },
     tabs: Array.from(tabs.values()).map((t) => ({ ...t })),
-    lastSeenInput: Array.from(lastSeenInput.entries()),
-    popupState: { ...popupState }
+    lastSeenInput: Array.from(lastSeenInput.entries())
   }
   try {
     await new Promise<void>((resolve) =>
@@ -223,7 +178,6 @@ const restoreState = async (): Promise<boolean> => {
   Object.assign(windowMetrics, s.windowMetrics)
   for (const t of s.tabs) tabs.set(t.tabId, t)
   for (const [id, input] of s.lastSeenInput) lastSeenInput.set(id, input)
-  if (s.popupState) Object.assign(popupState, s.popupState)
   return true
 }
 
@@ -562,20 +516,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     domain: domainOf(sender.tab?.url ?? "")
   })
   sendResponse(id)
-})
-
-// Handle popup state updates
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg || msg.type !== "update-popup-state") return
-  Object.assign(popupState, msg.state)
-  schedulePersist()
-  sendResponse({ success: true })
-})
-
-// Handle popup state requests
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg || msg.type !== "get-popup-state") return
-  sendResponse({ state: { ...popupState } })
 })
 
 // Live write visibility — fires the moment a tracker pushes new counters.
