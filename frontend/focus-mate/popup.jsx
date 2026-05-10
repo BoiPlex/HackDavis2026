@@ -614,7 +614,7 @@ function HeatMap({
         <button
           type="button"
           onClick={() => setScope("all")}
-          className={`px-2.5 py-[2px] rounded-full text-[10px] font-bold cursor-pointer border-0 transition-colors ${scope === "all" ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1]"}`}>
+          className={`px-2.5 py-[2px] rounded-full text-[10px] font-bold cursor-pointer border-0 transition-colors ${scope === "all" ? "bg-[#3B82F6] text-white" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1]"}`}>
           All tabs
         </button>
         <button
@@ -1865,7 +1865,7 @@ function IndexPopup() {
               }`}>
               {aiLoading ? (
                 <span className="opacity-60">
-                  Reading your recent activity...
+                  Reading your recent activity... Don't click off!
                 </span>
               ) : aiError ? (
                 aiError

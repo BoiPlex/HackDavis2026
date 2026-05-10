@@ -8,7 +8,7 @@ from bson import ObjectId
 
 from db import db
 from models import *
-from llm import ask_backboard
+from llm import ask_backboard, create_assistant
 
 LIMIT = 100
 ACTIVITY_LIMIT = 10000
@@ -69,23 +69,16 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
     user = user_data.get("user", {})
     settings = user.get("settings", {})
     
+    if "assistantId" not in user:
+        user["assistantId"] = await create_assistant()
+        await update_user(userId, {"assistantId": user["assistantId"]}) # non-blocking to save user's new assistant
+        print(f"user {userId} created assistant {user['assistantId']}")
+    else:
+        print(f"user {userId} using assistant {user['assistantId']}")
+    
     usage_summary = summarize_activity_logs(logs)
 
     message = f"""
-    You are a concise productivity coach for a browser activity tracker.
-    Answer the user's question using only the data provided below as well as tailored time management advice.
-    Be supportive and helpful. The user struggles with focusing and distractions. Provide tailored thoughtful advice.
-    Given:
-    - 24 hour usage summary
-    - Heatmap goes by 24 hours and 5 minute buckets, and shows a variety of useful metrics.
-    - Current quest, one of Research, Work, or Distractions.
-    - user-specified productive (contributing) and unproductive domains in tabs, heatmap, 
-    - Goal and timer represent the user's Pomodoro timer goal and state.
-    Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, scrolling, cursor movement, and overall engagement when relevant.
-    If the summary or any provided data does not contain enough evidence, say what data is missing.
-    Naturally convert time into the smallest unit of time possible.
-    Write response in plaintext, styling is not possible.
-
     User question:
     {question}
 
@@ -107,10 +100,9 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
     Timer:
     {user.get("timer")}
     """
-    print(f"user {userId} message: {message}")
 
     try:
-        response = await ask_backboard(message)
+        response = await ask_backboard(message, userId, assistantId=user["assistantId"])
     except Exception as error:
         raise HTTPException(
             status_code=502,
@@ -123,9 +115,7 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
         "logCount": len(logs),
         "answer": response["content"],
         "thread_id": response["thread_id"],
-        "assistant_id": response["assistant_id"],
-    }
-
+    }    
 
 # --- Users ---
 
