@@ -739,7 +739,7 @@ function IndexPopup() {
         className={`col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
         <span className="text-[1rem]">{g.mins}m</span>
         {!isSideQuest && (
-          <span className="text-[0.875rem] opacity-70 font-medium">+{g.break}m</span>
+          <span className="text-[0.875rem] opacity-70 font-medium">+{g.break}m break</span>
         )}
       </button>
     )
