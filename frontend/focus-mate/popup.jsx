@@ -16,18 +16,18 @@ const MICRO_GOALS = [
   { mins: 45, break: 15, label: "Deep Dive" }
 ]
 
-const TIMEFRAMES = [
-  { id: "24h",   label: "24h"   },
-  { id: "week",  label: "Week"  },
-  { id: "month", label: "Month" },
-  { id: "year",  label: "Year"  }
-]
+// const TIMEFRAMES = [
+//   { id: "24h",   label: "24h"   },
+//   { id: "week",  label: "Week"  },
+//   { id: "month", label: "Month" },
+//   { id: "year",  label: "Year"  }
+// ]
 
 // Tailwind helper class strings used in place of the old inline-style helpers
 const inputClasses =
-  "w-[42px] ml-1 px-[5px] py-[3px] text-[11px] font-bold text-center border border-black/10 rounded-md bg-white/90 outline-none"
+  "w-[63px] ml-1 px-[8px] py-[5px] text-base font-bold text-center border border-black/10 rounded-md bg-white/90 outline-none"
 const controlBtnClasses =
-  "flex-1 p-2.5 rounded-xl border-0 font-bold text-[12px] cursor-pointer"
+  "flex-1 p-2.5 rounded-xl border-0 font-bold text-base cursor-pointer"
 
 // ---- Storage abstraction ----
 const hasChrome = typeof chrome !== "undefined" && chrome?.storage?.local
@@ -153,9 +153,9 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1F2937]">
-        <div className="text-[9px] opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
+        <div className="text-sm opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
         <div className="text-[32px] font-extrabold leading-none mt-0.5 tabular-nums">{primaryLabel}</div>
-        <div className="text-[9px] opacity-60 mt-[3px] text-center px-2.5">{subLabel}</div>
+        <div className="text-sm opacity-60 mt-[3px] text-center px-2.5">{subLabel}</div>
       </div>
     </div>
   )
@@ -170,7 +170,7 @@ function HeatMap({ data }) {
     <div className="w-full flex flex-col">
 
       {/* ===== Legend (TOP) ===== */}
-      <div className="flex items-center justify-center gap-4 mb-2 text-[10px] opacity-80">
+      <div className="flex items-center justify-center gap-4 mb-2 text-sm opacity-80">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm"/>
           <span>Deep focus</span>
@@ -191,7 +191,7 @@ function HeatMap({ data }) {
         <div
           className="flex items-center justify-center pr-1 select-none"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-          <span className="text-[10px] font-bold opacity-70 tracking-[2px] uppercase">Hours</span>
+          <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">Hours</span>
         </div>
 
         <div className="flex-1">
@@ -201,7 +201,7 @@ function HeatMap({ data }) {
               className="grid gap-[2px] mb-0.5"
               style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
               {/* Y-axis numbers — increment by 3 up to 12 (rows 2,5,8,11 → 3,6,9,12) */}
-              <div className="text-[9px] opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
+              <div className="text-sm opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
                 {((b + 1) % 3 === 0) ? `${b + 1}` : ""}
               </div>
               {Array.from({ length: HOURS }).map((_, h) => {
@@ -227,14 +227,14 @@ function HeatMap({ data }) {
             <div />
             {Array.from({ length: HOURS }).map((_, h) => (
               <div key={h}
-                className={`text-[9px] opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
+                className={`text-sm opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
                 {h + 1}
               </div>
             ))}
           </div>
 
           {/* X-axis title */}
-          <div className="text-[10px] font-bold opacity-70 tracking-[2px] uppercase text-center mt-1">
+          <div className="text-sm font-bold opacity-70 tracking-[2px] uppercase text-center mt-1">
             Minutes
           </div>
         </div>
@@ -242,7 +242,7 @@ function HeatMap({ data }) {
 
       {/* ===== Selected cell detail ===== */}
       {selected && (
-        <div className="mt-2 px-3 py-2 rounded-lg bg-white/85 border border-black/10 flex items-center justify-between text-[11px] animate-[fadeIn_200ms_ease]">
+        <div className="mt-2 px-3 py-2 rounded-lg bg-white/85 border border-black/10 flex items-center justify-between text-base animate-[fadeIn_200ms_ease]">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-bold tabular-nums">
               cell ({selected.h + 1}, {selected.b + 1})
@@ -264,7 +264,7 @@ function HeatMap({ data }) {
           <button
             type="button"
             onClick={() => setSelected(null)}
-            className="text-[11px] opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
+            className="text-base opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
             ✕
           </button>
         </div>
@@ -276,7 +276,7 @@ function HeatMap({ data }) {
 // =================================================================
 function IndexPopup() {
   const [view, setView] = useState("heatmap")
-  const [timeframe, setTimeframe] = useState("24h")
+  // const [timeframe, setTimeframe] = useState("24h")
 
   const [activeQuest, setActiveQuest] = useState(null)
   const [goal, setGoal] = useState(MICRO_GOALS[1])
@@ -483,13 +483,13 @@ function IndexPopup() {
 
   return (
     <div ref={containerRef}
-      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
+      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] text-base overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
       style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}>
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.6} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        .quest-btn { border:none; padding:7px 12px; border-radius:999px; font-size:11px; font-weight:600; cursor:pointer; color:white;
+        .quest-btn { border:none; padding:7px 12px; border-radius:999px; font-size:0.875rem; font-weight:600; cursor:pointer; color:white;
           transition: opacity 220ms ease, transform 120ms ease, box-shadow 120ms ease; }
         .quest-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .card { background: rgba(255,255,255,0.82); backdrop-filter: blur(8px);
@@ -503,7 +503,7 @@ function IndexPopup() {
         .scroll-y::-webkit-scrollbar { width: 6px; }
         .scroll-y::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
         .icon-btn { border:none; background: rgba(0,0,0,0.06); padding:5px 10px; border-radius:999px;
-          font-size:11px; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
+          font-size:1rem; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
         .icon-btn:hover { background: rgba(0,0,0,0.12); }
         .brand-lockup { display:flex; align-items:center; gap:9px; }
         .brand-mark {
@@ -520,7 +520,7 @@ function IndexPopup() {
           color:#111827;
         }
         .brand-subtitle {
-          margin-top:3px; font-size:10px; font-weight:650;
+          margin-top:2px; font-size:0.875rem; font-weight:650;
           color:rgba(31,41,55,0.62); letter-spacing:0;
         }
       `}</style>
@@ -536,7 +536,7 @@ function IndexPopup() {
           <div className="brand-lockup">
             <div className="brand-mark">💡</div>
             <div>
-              <div className="brand-name">FocusBuddy</div>
+              <div className="brand-name">FlowState</div>
               <div className="brand-subtitle">
                 {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
               </div>
@@ -548,7 +548,7 @@ function IndexPopup() {
             <button className="icon-btn" onClick={() => setView("focus")}>⏱ {timeLeft}</button>
           )}
           <div title="Other FocusBuddy users in a focus session right now"
-            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-[11px] font-semibold">
+            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-sm font-semibold">
             <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]"/>
             {bodyDouble} others focusing now
           </div>
@@ -560,26 +560,26 @@ function IndexPopup() {
         <div className="flex flex-col flex-1 min-h-0 gap-2.5">
           <div className="card flex-1 flex flex-col min-h-0">
             <div className="flex justify-between items-center mb-2 gap-3">
-              <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
+              <div className="text-base font-bold opacity-70 tracking-[1px]">
                 📊 ACTIVITY HEAT MAP
               </div>
 
               {/* Timeframe selector */}
-              <div className="flex items-center gap-1 bg-black/[0.05] rounded-full p-0.5">
+              {/* <div className="flex items-center gap-1 bg-black/[0.05] rounded-full p-0.5">
                 {TIMEFRAMES.map((tf) => {
                   const active = timeframe === tf.id
                   return (
                     <button
                       key={tf.id}
                       onClick={() => setTimeframe(tf.id)}
-                      className={`px-2.5 py-[3px] rounded-full text-[10px] font-bold transition-colors cursor-pointer ${active ? "bg-[#1F2937] text-white" : "text-[#1F2937]/70 hover:text-[#1F2937]"}`}>
+                      className={`px-2.5 py-[3px] rounded-full text-sm font-bold transition-colors cursor-pointer ${active ? "bg-[#1F2937] text-white" : "text-[#1F2937]/70 hover:text-[#1F2937]"}`}>
                       {tf.label}
                     </button>
                   )
                 })}
-              </div>
+              </div> */}
 
-              <div className="text-[9px] opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
+              <div className="text-xs opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
             </div>
             <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
               <HeatMap data={heatData} />
@@ -587,7 +587,7 @@ function IndexPopup() {
           </div>
 
           <button onClick={() => setView("focus")}
-            className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
+            className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-base cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
             onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
             onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
             {phase === "work" || phase === "break"
@@ -602,8 +602,8 @@ function IndexPopup() {
         <div className="grid grid-cols-2 gap-2.5 flex-1 min-h-0">
           {/* LEFT */}
           <div className="flex flex-col gap-2 min-h-0">
-            <div className="card shrink-0 !py-2 !px-3">
-              <div className="text-[9px] font-bold opacity-[0.55] mb-1.5 tracking-[1.5px]">
+            <div className="card shrink-0 !py-3 !px-3">
+              <div className="text-sm font-bold opacity-[0.55] mb-6 tracking-[1.5px]">
                 STEP 1 · CHOOSE YOUR QUEST
               </div>
               <div className="flex flex-wrap gap-[5px]">
@@ -621,41 +621,41 @@ function IndexPopup() {
                 })}
               </div>
               {isSideQuest && (
-                <div className="text-[9px] opacity-70 mt-[5px] italic">
+                <div className="text-sm opacity-70 mt-[5px] italic">
                   Side Quests are stimulation, not failure — running without a break.
                 </div>
               )}
             </div>
 
-            <div className="card flex-1 flex flex-col min-h-0">
+            <div className="card flex-1 flex flex-col min-h-0 py-6">
               <div className="flex justify-between items-center">
-                <div className="text-[9px] font-bold opacity-[0.65] tracking-[1px]">
-                  STEP 2 · 🧭 ACTIVE GOAL MAP
+                <div className="text-sm font-bold opacity-[0.65] tracking-[1px]">
+                  STEP 2 · 🧭 GOAL MAP
                 </div>
                 <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
-                  className={`border-0 px-2 py-[3px] rounded-full text-white text-[9px] font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
+                  className={`border-0 px-2 py-[3px] rounded-full text-white text-xs font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   🔥 Brain Dump ({sideQuestTabs.length})
                 </button>
               </div>
 
-              <div className="flex gap-[5px] my-1.5 shrink-0">
+              <div className="flex gap-[5px] my-6 shrink-0">
                 <input value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTrailDomain()}
                   placeholder="Add a domain (e.g. react.dev)"
-                  className="flex-1 px-[9px] py-[5px] text-[11px] border border-black/10 rounded-lg bg-white/80 outline-none"/>
+                  className="flex-1 px-[9px] py-[5px] text-base border border-black/10 rounded-lg bg-white/80 outline-none"/>
                 <button onClick={addTrailDomain} disabled={!newDomain.trim()}
-                  className={`border-0 px-[11px] py-[5px] rounded-lg text-white text-[11px] font-bold ${newDomain.trim() ? "bg-[#1F2937] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
+                  className={`border-0 px-[11px] py-[5px] rounded-lg text-white text-base font-bold ${newDomain.trim() ? "bg-[#1F2937] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   + Add
                 </button>
               </div>
 
               <div className="scroll-y flex-1 min-h-0 pr-1">
-                <div className="text-[9px] font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
+                <div className="text-sm font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
                   ✓ ON THE TRAIL · {formatTime(totalContributingSecs)} invested
                 </div>
                 {contributingTabs.length === 0 && (
-                  <div className="text-[10px] opacity-50 italic pt-[3px] pb-1.5">
+                  <div className="text-sm opacity-50 italic pt-[3px] pb-1.5">
                     No quest tabs yet. Add one above to unlock the timer.
                   </div>
                 )}
@@ -665,7 +665,7 @@ function IndexPopup() {
                       onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                     <div className="flex-1 overflow-hidden">
                       <div className="truncate font-semibold">{t.title}</div>
-                      <div className="text-[9px] opacity-60 flex gap-1.5">
+                      <div className="text-sm opacity-60 flex gap-1.5">
                         <span>{t.url}</span><span>·</span>
                         <span>{t.visits} visits</span><span>·</span>
                         <span>{formatTime(t.secondsOn)}</span>
@@ -676,7 +676,7 @@ function IndexPopup() {
 
                 {sideQuestTabs.length > 0 && (
                   <>
-                    <div className="text-[9px] font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-[0.5px]">
+                    <div className="text-sm font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-[0.5px]">
                       🐇 SIDE QUESTS · stimulation, not failure
                     </div>
                     {sideQuestTabs.map((t) => (
@@ -685,7 +685,7 @@ function IndexPopup() {
                           onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                         <div className="flex-1 overflow-hidden">
                           <div className="truncate">{t.title}</div>
-                          <div className="text-[9px] opacity-60 flex gap-1.5">
+                          <div className="text-sm opacity-60 flex gap-1.5">
                             <span>{t.url}</span><span>·</span>
                             <span>{t.visits} visits</span><span>·</span>
                             <span>{formatTime(t.secondsOn)}</span>
@@ -697,7 +697,7 @@ function IndexPopup() {
                 )}
 
                 {savedCount > 0 && (
-                  <div className="mt-1.5 text-[10px] opacity-70">
+                  <div className="mt-1.5 text-sm opacity-70">
                     💾 {savedCount} tab{savedCount !== 1 ? "s" : ""} saved to "Read Later"
                   </div>
                 )}
@@ -707,7 +707,7 @@ function IndexPopup() {
 
           {/* RIGHT */}
           <div className="flex flex-col gap-2 min-h-0">
-            <div className="card flex-1 flex flex-col">
+            <div className="card flex-1 flex flex-col overflow-y-auto">
               <HeroRing
                 progress={progress}
                 color={ringColor}
@@ -717,41 +717,46 @@ function IndexPopup() {
               />
 
               <div className="mt-1">
-                <div className="text-[9px] font-bold opacity-[0.55] mb-1 tracking-[1.5px] text-center">
+                <div className="text-sm font-bold opacity-[0.55] mb-6 tracking-[1.5px] text-center">
                   STEP 3 · MICRO-GOAL{isSideQuest ? " (no break)" : ""}
                 </div>
-                <div className="grid grid-cols-5 gap-1">
-                  {MICRO_GOALS.map((g) => {
-                    const selected = !isCustom && goal.mins === g.mins
-                    return (
-                      <button key={g.mins}
-                        onClick={() => { setGoal(g); setIsCustom(false) }}
-                        disabled={running}
-                        className={`border-0 px-0.5 py-[5px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-px ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
-                        <span className="text-[11px]">{g.mins}m</span>
-                        {!isSideQuest && (
-                          <span className="text-[8px] opacity-70 font-medium">+{g.break}m</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                  <button onClick={() => setIsCustom(true)} disabled={running}
-                    className={`border-0 px-0.5 py-[5px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-px ${running ? "cursor-not-allowed" : "cursor-pointer"} ${isCustom ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
-                    <span className="text-[11px]">⚙</span>
-                    <span className="text-[8px] opacity-70 font-medium">custom</span>
-                  </button>
-                </div>
+                {/* 4-col tracking grid lets the 4 micro-goals form a 2×2,
+    while the custom button sits centered (col-start-2 col-span-2)
+    below them as the bottom-middle slot. */}
+<div className="grid grid-cols-4 gap-1.5">
+  {MICRO_GOALS.map((g) => {
+    const selected = !isCustom && goal.mins === g.mins
+    return (
+      <button key={g.mins}
+        onClick={() => { setGoal(g); setIsCustom(false) }}
+        disabled={running}
+        className={`col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+        <span className="text-[1rem]">{g.mins}m</span>
+        {!isSideQuest && (
+          <span className="text-[0.875rem] opacity-70 font-medium">+{g.break}m</span>
+        )}
+      </button>
+    )
+  })}
+
+  {/* Custom — centered under the 2×2 */}
+  <button onClick={() => setIsCustom(true)} disabled={running}
+    className={`col-start-2 col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${isCustom ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+    <span className="text-[1.25rem]">⚙</span>
+    <span className="text-[0.875rem] opacity-70 font-medium">custom</span>
+  </button>
+</div>
 
                 {isCustom && (
                   <div className="flex gap-2 mt-[5px] items-center justify-center">
-                    <label className="text-[10px] font-semibold opacity-70">
+                    <label className="text-sm font-semibold opacity-70">
                       Work
                       <input type="number" min={1} max={180} value={customWork}
                         onChange={(e) => setCustomWork(Math.max(1, parseInt(e.target.value) || 1))}
                         disabled={running} className={inputClasses}/> m
                     </label>
                     {!isSideQuest && (
-                      <label className="text-[10px] font-semibold opacity-70">
+                      <label className="text-sm font-semibold opacity-70">
                         Break
                         <input type="number" min={0} max={60} value={customBreak}
                           onChange={(e) => setCustomBreak(Math.max(0, parseInt(e.target.value) || 0))}
@@ -767,7 +772,7 @@ function IndexPopup() {
                   <button onClick={startQuest} disabled={!canStart}
                     title={!activeQuest ? "Pick a quest first"
                       : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
-                    className={`flex-1 p-2.5 rounded-xl border-0 text-white font-bold text-[12px] transition-all duration-200 ${canStart ? "cursor-pointer" : "cursor-not-allowed"}`}
+                    className={`flex-1 p-2.5 rounded-xl border-0 text-white font-bold text-base transition-all duration-200 ${canStart ? "cursor-pointer" : "cursor-not-allowed"}`}
                     style={{
                       background: canStart ? ringColor : "rgba(0,0,0,0.15)",
                       boxShadow: canStart ? `0 4px 14px ${ringColor}55` : "none"
@@ -789,17 +794,17 @@ function IndexPopup() {
 
             {showNudge && (
               <div className="card bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">
-                <div className="text-[11px] font-bold mb-[3px]">👋 Hey, gentle check-in</div>
-                <div className="text-[10px] opacity-80 mb-1.5">
+                <div className="text-base font-bold mb-[3px]">👋 Hey, gentle check-in</div>
+                <div className="text-sm opacity-80 mb-1.5">
                   Is this what you meant to be doing right now? No judgment.
                 </div>
                 <div className="flex gap-[5px]">
                   <button onClick={() => setShowNudge(false)}
-                    className="flex-1 p-[7px] rounded-lg border-0 bg-[#1F2937] text-white font-bold text-[10px] cursor-pointer">
+                    className="flex-1 p-[7px] rounded-lg border-0 bg-[#1F2937] text-white font-bold text-sm cursor-pointer">
                     ↩ Take me back to {activeProject}
                   </button>
                   <button onClick={() => setShowNudge(false)}
-                    className="px-[9px] py-[7px] rounded-lg border-0 bg-black/[0.08] text-[10px] cursor-pointer">
+                    className="px-[9px] py-[7px] rounded-lg border-0 bg-black/[0.08] text-sm cursor-pointer">
                     Not now
                   </button>
                 </div>
