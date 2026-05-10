@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import "./style.css" // tailwind entrypoint (must contain @tailwind base/components/utilities)
 
 const STORAGE_KEY = "focusbuddy_timer"
 
@@ -14,6 +15,12 @@ const MICRO_GOALS = [
   { mins: 25, break: 10, label: "Pomodoro" },
   { mins: 45, break: 15, label: "Deep Dive" }
 ]
+
+// Tailwind class strings used in place of the old inline style helpers
+const inputClasses =
+  "w-[42px] ml-1 px-[5px] py-[3px] text-[11px] font-bold text-center border border-black/10 rounded-md bg-white/90 outline-none"
+const controlBtnClasses =
+  "flex-1 p-2.5 rounded-xl border-0 font-bold text-[12px] cursor-pointer"
 
 // ---- Storage abstraction (works in extension OR plain dev) ----
 const hasChrome = typeof chrome !== "undefined" && chrome?.storage?.local
@@ -87,10 +94,11 @@ function heatColor(cell, maxTotal) {
 // ---- Components ----
 function Sparkle({ x, y }) {
   return (
-    <div style={{
-      position: "absolute", left: x, top: y, pointerEvents: "none", fontSize: 18,
-      animation: "sparklePop 700ms ease-out forwards"
-    }}>✨</div>
+    <div
+      className="absolute pointer-events-none text-[18px] animate-[sparklePop_700ms_ease-out_forwards]"
+      style={{ left: x, top: y }}>
+      ✨
+    </div>
   )
 }
 
@@ -99,13 +107,14 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
   const C = 2 * Math.PI * radius
   const offset = C - progress * C
   return (
-    <div style={{ position: "relative", width: size, height: size, margin: "0 auto" }}>
-      <div style={{
-        position: "absolute", inset: -8, borderRadius: "50%",
-        background: `radial-gradient(circle, ${color}33 0%, transparent 70%)`,
-        filter: "blur(8px)", opacity: progress > 0 ? 1 : 0,
-        transition: "opacity 800ms ease"
-      }}/>
+    <div className="relative mx-auto" style={{ width: size, height: size }}>
+      <div
+        className="absolute -inset-2 rounded-full blur-[8px] transition-opacity duration-[800ms]"
+        style={{
+          background: `radial-gradient(circle, ${color}33 0%, transparent 70%)`,
+          opacity: progress > 0 ? 1 : 0
+        }}
+      />
       <svg width={size} height={size}>
         <defs>
           <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -118,16 +127,13 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
         <circle cx={size/2} cy={size/2} r={radius}
           stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
           strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.6s linear",
-                   transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}/>
+          className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
+        />
       </svg>
-      <div style={{
-        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", color: "#1F2937"
-      }}>
-        <div style={{ fontSize: 9, opacity: 0.6, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>{mode}</div>
-        <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{primaryLabel}</div>
-        <div style={{ fontSize: 9, opacity: 0.6, marginTop: 3, textAlign: "center", padding: "0 10px" }}>{subLabel}</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1F2937]">
+        <div className="text-[9px] opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
+        <div className="text-[32px] font-extrabold leading-none mt-0.5 tabular-nums">{primaryLabel}</div>
+        <div className="text-[9px] opacity-60 mt-[3px] text-center px-2.5">{subLabel}</div>
       </div>
     </div>
   )
@@ -137,30 +143,25 @@ function HeatMap({ data }) {
   const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
   const HOURS = 24, BUCKETS = 12
   return (
-    <div style={{ width: "100%" }}>
+    <div className="w-full">
       {/* hour labels */}
-      <div style={{
-        display: "grid", gridTemplateColumns: `28px repeat(${HOURS}, 1fr)`,
-        gap: 2, marginBottom: 4
-      }}>
+      <div
+        className="grid gap-[2px] mb-1"
+        style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
         <div />
         {Array.from({ length: HOURS }).map((_, h) => (
-          <div key={h} style={{
-            fontSize: 9, opacity: 0.6, textAlign: "center",
-            visibility: h % 3 === 0 ? "visible" : "hidden", fontWeight: 600
-          }}>{String(h).padStart(2, "0")}</div>
+          <div key={h}
+            className={`text-[9px] opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
+            {String(h).padStart(2, "0")}
+          </div>
         ))}
       </div>
       {/* grid */}
       {Array.from({ length: BUCKETS }).map((_, b) => (
-        <div key={b} style={{
-          display: "grid", gridTemplateColumns: `28px repeat(${HOURS}, 1fr)`,
-          gap: 2, marginBottom: 2
-        }}>
-          <div style={{
-            fontSize: 9, opacity: 0.6, textAlign: "right", paddingRight: 4,
-            display: "flex", alignItems: "center", justifyContent: "flex-end", fontWeight: 600
-          }}>
+        <div key={b}
+          className="grid gap-[2px] mb-0.5"
+          style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
+          <div className="text-[9px] opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
             {b % 2 === 0 ? `:${String(b * 5).padStart(2, "0")}` : ""}
           </div>
           {Array.from({ length: HOURS }).map((_, h) => {
@@ -168,30 +169,25 @@ function HeatMap({ data }) {
             return (
               <div key={h}
                 title={`${String(h).padStart(2,"0")}:${String(b*5).padStart(2,"0")} · focus ${cell.focus}s · activity ${cell.dist}`}
-                style={{
-                  height: 20, borderRadius: 3,
-                  background: heatColor(cell, maxTotal),
-                  transition: "background 200ms ease"
-                }}/>
+                className="h-5 rounded-[3px] transition-colors duration-200"
+                style={{ background: heatColor(cell, maxTotal) }}
+              />
             )
           })}
         </div>
       ))}
       {/* legend */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginTop: 12, fontSize: 10, opacity: 0.75
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 10, background: "rgba(59,130,246,0.85)", borderRadius: 2 }}/>
+      <div className="flex items-center justify-between mt-3 text-[10px] opacity-75">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm"/>
           <span>Deep focus</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 10, background: "rgba(245,158,11,0.85)", borderRadius: 2 }}/>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-2.5 bg-[rgba(245,158,11,0.85)] rounded-sm"/>
           <span>Tab-switching / scrolling</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 10, background: "rgba(0,0,0,0.06)", borderRadius: 2 }}/>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-2.5 bg-black/[0.06] rounded-sm"/>
           <span>Quiet</span>
         </div>
       </div>
@@ -201,17 +197,14 @@ function HeatMap({ data }) {
 
 // =================================================================
 function IndexPopup() {
-  // 🔑 Heatmap is ALWAYS the default view on popup open.
   const [view, setView] = useState("heatmap")
 
-  // setup
   const [activeQuest, setActiveQuest] = useState(null)
   const [goal, setGoal] = useState(MICRO_GOALS[1])
   const [isCustom, setIsCustom] = useState(false)
   const [customWork, setCustomWork] = useState(20)
   const [customBreak, setCustomBreak] = useState(7)
 
-  // mirrors chrome.storage.local
   const [timer, setTimer] = useState(null)
   const [, force] = useState(0)
 
@@ -244,8 +237,6 @@ function IndexPopup() {
       const s = await readStore()
       if (!mounted) return
       setTimer(s)
-      // Only hydrate the QUEST selection from storage on first load,
-      // but DO NOT change the default view (heatmap stays default).
       if (!hydratedRef.current && s?.quest) {
         const q = QUEST_TAGS.find((t) => t.id === s.quest.id)
         if (q) setActiveQuest(q)
@@ -267,7 +258,7 @@ function IndexPopup() {
     }
   }, [])
 
-  // ---- Local tick: keeps countdown smooth + handles phase boundaries while popup is open ----
+  // ---- Local tick ----
   useEffect(() => {
     const id = setInterval(async () => {
       const s = await readStore()
@@ -295,7 +286,6 @@ function IndexPopup() {
     return () => clearInterval(id)
   }, [])
 
-  // body double
   useEffect(() => {
     const id = setInterval(() => {
       setBodyDouble((n) => Math.max(50, n + Math.floor(Math.random() * 7 - 3)))
@@ -303,7 +293,6 @@ function IndexPopup() {
     return () => clearInterval(id)
   }, [])
 
-  // nudge
   useEffect(() => {
     const distract = tabs.find((t) => !t.contributing && t.friction > 0.85)
     if (distract && timer?.phase === "work" && !timer?.pausedAt) {
@@ -312,7 +301,6 @@ function IndexPopup() {
     }
   }, [tabs, timer])
 
-  // ---- Reward ----
   const triggerReward = (e) => {
     const rect = containerRef.current?.getBoundingClientRect()
     const x = (e?.clientX ?? 0) - (rect?.left || 0)
@@ -341,7 +329,6 @@ function IndexPopup() {
     contributingTabs.length > 0 &&
     (!isCustom || (customWork > 0 && (isSideQuest || customBreak >= 0)))
 
-  // ---- Actions: write to storage; background reschedules its alarm ----
   const startQuest = async () => {
     if (!canStart) return
     const next = {
@@ -416,87 +403,58 @@ function IndexPopup() {
       : "🎉 nice work"
 
   return (
-    <div ref={containerRef}
-      style={{
-        position: "relative", width: 760, height: 580, padding: 14,
-        fontFamily: "'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
-        background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)`,
-        color: "#1F2937", transition: "background 1.2s ease",
-        overflow: "hidden", boxSizing: "border-box",
-        display: "flex", flexDirection: "column"
-      }}>
+    <div 
+      ref={containerRef}
+      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable',_system-ui,_sans-serif] text-[#1F2937] overflow-hidden flex flex-col transition-[background] duration-[1200ms] ease-in-out"
+      style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}
+    >
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.6} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        .quest-btn { border:none; padding:7px 12px; border-radius:999px; font-size:11px; font-weight:600; cursor:pointer; color:white;
-          transition: opacity 220ms ease, transform 120ms ease, box-shadow 120ms ease; }
-        .quest-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .card { background: rgba(255,255,255,0.82); backdrop-filter: blur(8px);
-          border-radius: 12px; padding: 10px 12px;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.06); animation: fadeIn 300ms ease; box-sizing: border-box; }
-        .tab-row { display:flex; align-items:center; gap:8px; padding:5px 7px; border-radius:8px; margin-bottom:3px;
-          font-size:11px; background: rgba(255,255,255,0.6); transition: background 200ms ease; }
-        .tab-contrib { background: linear-gradient(90deg, #DCFCE7, rgba(255,255,255,0.6)); border-left: 3px solid #34D399; }
-        .tab-side    { background: linear-gradient(90deg, #FEE2E2, rgba(255,255,255,0.6)); border-left: 3px solid #EF4444; opacity: 0.9; }
-        .scroll-y { overflow-y:auto; scrollbar-width: thin; }
-        .scroll-y::-webkit-scrollbar { width: 6px; }
-        .scroll-y::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
-        .icon-btn { border:none; background: rgba(0,0,0,0.06); padding:5px 10px; border-radius:999px;
-          font-size:11px; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
-        .icon-btn:hover { background: rgba(0,0,0,0.12); }
-        .brand-lockup { display:flex; align-items:center; gap:9px; }
-        .brand-mark {
-          width:30px; height:30px; border-radius:9px;
-          display:flex; align-items:center; justify-content:center;
-          background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-          color:#92400E; font-size:17px;
-          box-shadow: 0 8px 18px rgba(245,158,11,0.22);
-        }
-        .brand-name {
-          font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-          font-size:22px; font-weight:700; line-height:1;
-          letter-spacing:0;
-          color:#111827;
-        }
-        .brand-subtitle {
-          margin-top:3px; font-size:10px; font-weight:650;
-          color:rgba(31,41,55,0.62); letter-spacing:0;
-        }
       `}</style>
 
       {sparkles.map((s) => <Sparkle key={s.id} x={s.x} y={s.y} />)}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="flex items-center justify-between mb-[10px] shrink-0">
+        <div className="flex items-center gap-[10px]">
           {view === "focus" && (
-            <button className="icon-btn" onClick={() => setView("heatmap")}>← Back</button>
+            <button 
+              className="border-none bg-black/5 px-2.5 py-[5px] rounded-full text-[11px] font-bold cursor-pointer text-[#1F2937] transition-colors duration-150 hover:bg-black/10" 
+              onClick={() => setView("heatmap")}
+            >
+              ← Back
+            </button>
           )}
-          <div className="brand-lockup">
-            <div className="brand-mark">💡</div>
+          <div className="flex items-center gap-[9px]">
+            <div className="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] text-[#92400E] text-[17px] shadow-[0_8px_18px_rgba(245,158,11,0.22)]">
+              💡
+            </div>
             <div>
-              <div className="brand-name">FocusBuddy</div>
-              <div className="brand-subtitle">
+              <div className="font-['Playfair_Display',_serif] text-[22px] font-bold leading-none tracking-normal text-[#111827]">
+                FocusBuddy
+              </div>
+              <div className="mt-[3px] text-[10px] font-[650] text-[#1F2937]/60 tracking-normal">
                 {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
               </div>
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="flex gap-2 items-center">
           {(phase === "work" || phase === "break") && view === "heatmap" && (
-            <button className="icon-btn" onClick={() => setView("focus")}>⏱ {timeLeft}</button>
+            <button 
+              className="border-none bg-black/5 px-2.5 py-[5px] rounded-full text-[11px] font-bold cursor-pointer text-[#1F2937] transition-colors duration-150 hover:bg-black/10" 
+              onClick={() => setView("focus")}
+            >
+              ⏱ {timeLeft}
+            </button>
           )}
-          <div title="People focusing right now"
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(255,255,255,0.7)",
-              padding: "5px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600
-            }}>
-            <span style={{
-              display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-              background: "#34D399", animation: "pulse 1.6s infinite"
-            }}/>
+          <div 
+            title="People focusing right now"
+            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-[11px] font-semibold"
+          >
+            <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]" />
             {bodyDouble}
           </div>
         </div>
@@ -504,28 +462,23 @@ function IndexPopup() {
 
       {/* ============== HEATMAP (DEFAULT) ============== */}
       {view === "heatmap" && (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 10 }}>
-          <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.7, letterSpacing: 1 }}>
+        <div className="flex flex-col flex-1 min-h-0 gap-[10px]">
+          <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] box-border flex flex-1 flex-col min-h-0">
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[11px] font-bold opacity-70 tracking-widest">
                 📊 ACTIVITY HEAT MAP · LAST 24H
               </div>
-              <div style={{ fontSize: 9, opacity: 0.55 }}>Privacy-respecting · no URLs shown</div>
+              <div className="text-[9px] opacity-[0.55]">Privacy-respecting · no URLs shown</div>
             </div>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "4px 2px" }}>
+            <div className="flex-1 flex items-center justify-center min-h-0 py-1 px-[2px]">
               <HeatMap data={heatData} />
             </div>
           </div>
 
-          <button onClick={() => setView("focus")}
-            style={{
-              padding: "12px", border: "none", borderRadius: 12,
-              background: "#1F2937", color: "white", fontWeight: 700, fontSize: 13,
-              cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.15)", flexShrink: 0,
-              transition: "transform 120ms ease"
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
-            onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
+          <button 
+            onClick={() => setView("focus")}
+            className="p-3 border-none rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-120 active:scale-[0.98]"
+          >
             {phase === "work" || phase === "break"
               ? `▶ Resume Focus Session · ${timeLeft}`
               : "✨ Start a Focus Session"}
@@ -535,85 +488,86 @@ function IndexPopup() {
 
       {/* ============== FOCUS / TIMER VIEW ============== */}
       {view === "focus" && (
-        <div style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-          flex: 1, minHeight: 0
-        }}>
+        <div className="grid grid-cols-2 gap-[10px] flex-1 min-h-0">
           {/* LEFT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
-            <div className="card" style={{ flexShrink: 0, padding: "8px 12px" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.55, marginBottom: 6, letterSpacing: 1.5 }}>
+          <div className="flex flex-col gap-2 min-h-0">
+            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2 py-[10px] px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] shrink-0">
+              <div className="text-[9px] font-bold opacity-[0.55] mb-1.5 tracking-[1.5px]">
                 STEP 1 · CHOOSE YOUR QUEST
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              <div className="flex flex-wrap gap-1.25">
                 {QUEST_TAGS.map((q) => {
                   const selected = activeQuest?.id === q.id
                   const dimmed = activeQuest && !selected
                   return (
-                    <button key={q.id} className="quest-btn" onClick={(e) => pickQuest(q, e)}
-                      style={{
-                        background: q.color, opacity: dimmed ? 0.35 : 1,
+                    <button 
+                      key={q.id} 
+                      onClick={(e) => pickQuest(q, e)}
+                      className="border-none py-1.75 px-3 rounded-full text-[11px] font-semibold cursor-pointer text-white transition-all duration-220 ease-in-out hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+                      style={{ 
+                        background: q.color, 
+                        opacity: dimmed ? 0.35 : 1,
                         outline: selected ? "3px solid rgba(0,0,0,0.15)" : "none"
-                      }}>{q.label}</button>
+                      }}
+                    >
+                      {q.label}
+                    </button>
                   )
                 })}
               </div>
               {isSideQuest && (
-                <div style={{ fontSize: 9, opacity: 0.7, marginTop: 5, fontStyle: "italic" }}>
+                <div className="text-[9px] opacity-70 mt-1.25 italic">
                   Side Quests are stimulation, not failure — running without a break.
                 </div>
               )}
             </div>
 
-            <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.65, letterSpacing: 1 }}>
+            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] flex-1 flex flex-col min-h-0">
+              <div className="flex justify-between items-center">
+                <div className="text-[9px] font-bold opacity-[0.65] tracking-widest">
                   STEP 2 · 🧭 ACTIVE GOAL MAP
                 </div>
-                <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
-                  style={{
-                    border: "none", padding: "3px 8px", borderRadius: 999,
-                    background: sideQuestTabs.length ? "#EF4444" : "rgba(0,0,0,0.1)",
-                    color: "white", fontSize: 9, fontWeight: 700,
-                    cursor: sideQuestTabs.length ? "pointer" : "not-allowed"
-                  }}>🔥 Brain Dump ({sideQuestTabs.length})</button>
+                <button 
+                  onClick={brainDump} 
+                  disabled={sideQuestTabs.length === 0}
+                  className={`border-none px-2 py-[3px] rounded-full text-[9px] font-bold ${sideQuestTabs.length ? 'bg-[#EF4444] cursor-pointer' : 'bg-black/10 cursor-not-allowed'} text-white`}
+                >
+                  🔥 Brain Dump ({sideQuestTabs.length})
+                </button>
               </div>
 
-              <div style={{ display: "flex", gap: 5, margin: "6px 0", flexShrink: 0 }}>
-                <input value={newDomain}
+              <div className="flex gap-1.25 my-1.5 shrink-0">
+                <input 
+                  value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTrailDomain()}
                   placeholder="Add a domain (e.g. react.dev)"
-                  style={{
-                    flex: 1, padding: "5px 9px", fontSize: 11,
-                    border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8,
-                    background: "rgba(255,255,255,0.8)", outline: "none"
-                  }}/>
-                <button onClick={addTrailDomain} disabled={!newDomain.trim()}
-                  style={{
-                    border: "none", padding: "5px 11px", borderRadius: 8,
-                    background: newDomain.trim() ? "#1F2937" : "rgba(0,0,0,0.1)",
-                    color: "white", fontSize: 11, fontWeight: 700,
-                    cursor: newDomain.trim() ? "pointer" : "not-allowed"
-                  }}>+ Add</button>
+                  className="flex-1 px-2.25 py-[5px] text-[11px] border border-black/10 rounded-lg bg-white/80 outline-none"
+                />
+                <button 
+                  onClick={addTrailDomain} 
+                  disabled={!newDomain.trim()}
+                  className={`border-none px-2.75 py-[5px] rounded-lg font-bold text-[11px] text-white ${newDomain.trim() ? 'bg-[#1F2937] cursor-pointer' : 'bg-black/10 cursor-not-allowed'}`}
+                >
+                  + Add
+                </button>
               </div>
 
-              <div className="scroll-y" style={{ flex: 1, minHeight: 0, paddingRight: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#059669", marginBottom: 3, letterSpacing: 0.5 }}>
+              <div className="overflow-y-auto scrollbar-thin flex-1 min-h-0 pr-1 [scrollbar-width:thin]">
+                <div className="text-[9px] font-bold text-[#059669] mb-[3px] tracking-tight">
                   ✓ ON THE TRAIL · {formatTime(totalContributingSecs)} invested
                 </div>
                 {contributingTabs.length === 0 && (
-                  <div style={{ fontSize: 10, opacity: 0.5, fontStyle: "italic", padding: "3px 0 6px" }}>
+                  <div className="text-[10px] opacity-50 italic py-1 pb-1.5">
                     No quest tabs yet. Add one above to unlock the timer.
                   </div>
                 )}
                 {contributingTabs.map((t) => (
-                  <div key={t.id} className="tab-row tab-contrib">
-                    <input type="checkbox" checked={t.contributing}
-                      onChange={() => toggleContributing(t.id)} style={{ cursor: "pointer" }}/>
-                    <div style={{ flex: 1, overflow: "hidden" }}>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{t.title}</div>
-                      <div style={{ fontSize: 9, opacity: 0.6, display: "flex", gap: 6 }}>
+                  <div key={t.id} className="flex items-center gap-2 p-1.25 px-1.75 rounded-lg mb-[3px] text-[11px] bg-white/60 transition-colors duration-200 bg-gradient-to-r from-[#DCFCE7] to-white/60 border-l-[3px] border-[#34D399]">
+                    <input type="checkbox" checked={t.contributing} onChange={() => toggleContributing(t.id)} className="cursor-pointer" />
+                    <div className="flex-1 overflow-hidden">
+                      <div className="overflow-hidden text-ellipsis whitespace-nowrap font-semibold">{t.title}</div>
+                      <div className="text-[9px] opacity-60 flex gap-1.5">
                         <span>{t.url}</span><span>·</span>
                         <span>{t.visits} visits</span><span>·</span>
                         <span>{formatTime(t.secondsOn)}</span>
@@ -624,16 +578,15 @@ function IndexPopup() {
 
                 {sideQuestTabs.length > 0 && (
                   <>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#DC2626", marginTop: 6, marginBottom: 3, letterSpacing: 0.5 }}>
+                    <div className="text-[9px] font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-tight">
                       🐇 SIDE QUESTS · stimulation, not failure
                     </div>
                     {sideQuestTabs.map((t) => (
-                      <div key={t.id} className="tab-row tab-side">
-                        <input type="checkbox" checked={t.contributing}
-                          onChange={() => toggleContributing(t.id)} style={{ cursor: "pointer" }}/>
-                        <div style={{ flex: 1, overflow: "hidden" }}>
-                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                          <div style={{ fontSize: 9, opacity: 0.6, display: "flex", gap: 6 }}>
+                      <div key={t.id} className="flex items-center gap-2 p-1.25 px-1.75 rounded-lg mb-[3px] text-[11px] bg-white/60 transition-colors duration-200 bg-gradient-to-r from-[#FEE2E2] to-white/60 border-l-[3px] border-[#EF4444] opacity-90">
+                        <input type="checkbox" checked={t.contributing} onChange={() => toggleContributing(t.id)} className="cursor-pointer" />
+                        <div className="flex-1 overflow-hidden">
+                          <div className="overflow-hidden text-ellipsis whitespace-nowrap">{t.title}</div>
+                          <div className="text-[9px] opacity-60 flex gap-1.5">
                             <span>{t.url}</span><span>·</span>
                             <span>{t.visits} visits</span><span>·</span>
                             <span>{formatTime(t.secondsOn)}</span>
@@ -645,7 +598,7 @@ function IndexPopup() {
                 )}
 
                 {savedCount > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
+                  <div className="mt-1.5 text-[10px] opacity-70">
                     💾 {savedCount} tab{savedCount !== 1 ? "s" : ""} saved to "Read Later"
                   </div>
                 )}
@@ -654,8 +607,8 @@ function IndexPopup() {
           </div>
 
           {/* RIGHT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
-            <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", padding: "10px 12px" }}>
+          <div className="flex flex-col gap-2 min-h-0">
+            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] flex-1 flex flex-col">
               <HeroRing
                 progress={progress}
                 color={ringColor}
@@ -664,109 +617,114 @@ function IndexPopup() {
                 mode={ringMode}
               />
 
-              <div style={{ marginTop: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.55, marginBottom: 4, letterSpacing: 1.5, textAlign: "center" }}>
+              <div className="mt-1">
+                <div className="text-[9px] font-bold opacity-[0.55] mb-1 tracking-[1.5px] text-center">
                   STEP 3 · MICRO-GOAL{isSideQuest ? " (no break)" : ""}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4 }}>
+                <div className="grid grid-cols-5 gap-1">
                   {MICRO_GOALS.map((g) => {
                     const selected = !isCustom && goal.mins === g.mins
                     return (
-                      <button key={g.mins}
+                      <button 
+                        key={g.mins}
                         onClick={() => { setGoal(g); setIsCustom(false) }}
                         disabled={running}
-                        style={{
-                          border: "none", padding: "5px 2px", borderRadius: 8,
-                          fontSize: 10, fontWeight: 700,
-                          cursor: running ? "not-allowed" : "pointer",
-                          background: selected ? "#1F2937" : "rgba(0,0,0,0.06)",
-                          color: selected ? "white" : "#1F2937",
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: 1
-                        }}>
-                        <span style={{ fontSize: 11 }}>{g.mins}m</span>
-                        {!isSideQuest && (
-                          <span style={{ fontSize: 8, opacity: 0.7, fontWeight: 500 }}>+{g.break}m</span>
-                        )}
+                        className={`border-none py-1.25 px-[2px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-[1px] ${running ? 'cursor-not-allowed' : 'cursor-pointer'} ${selected ? 'bg-[#1F2937] text-white' : 'bg-black/5 text-[#1F2937]'}`}
+                      >
+                        <span className="text-[11px]">{g.mins}m</span>
+                        {!isSideQuest && <span className="text-[8px] opacity-70 font-medium">+{g.break}m</span>}
                       </button>
                     )
                   })}
-                  <button onClick={() => setIsCustom(true)} disabled={running}
-                    style={{
-                      border: "none", padding: "5px 2px", borderRadius: 8,
-                      fontSize: 10, fontWeight: 700,
-                      cursor: running ? "not-allowed" : "pointer",
-                      background: isCustom ? "#1F2937" : "rgba(0,0,0,0.06)",
-                      color: isCustom ? "white" : "#1F2937",
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 1
-                    }}>
-                    <span style={{ fontSize: 11 }}>⚙</span>
-                    <span style={{ fontSize: 8, opacity: 0.7, fontWeight: 500 }}>custom</span>
+                  <button 
+                    onClick={() => setIsCustom(true)} 
+                    disabled={running}
+                    className={`border-none py-1.25 px-[2px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-[1px] ${running ? 'cursor-not-allowed' : 'cursor-pointer'} ${isCustom ? 'bg-[#1F2937] text-white' : 'bg-black/5 text-[#1F2937]'}`}
+                  >
+                    <span className="text-[11px]">⚙</span>
+                    <span className="text-[8px] opacity-70 font-medium">custom</span>
                   </button>
                 </div>
 
                 {isCustom && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 5, alignItems: "center", justifyContent: "center" }}>
-                    <label style={{ fontSize: 10, fontWeight: 600, opacity: 0.7 }}>
+                  <div className="flex gap-2 mt-1.25 items-center justify-center">
+                    <label className="text-[10px] font-semibold opacity-70">
                       Work
-                      <input type="number" min={1} max={180} value={customWork}
+                      <input 
+                        type="number" min={1} max={180} value={customWork}
                         onChange={(e) => setCustomWork(Math.max(1, parseInt(e.target.value) || 1))}
-                        disabled={running} style={inputStyle}/> m
+                        disabled={running} 
+                        className="w-[42px] ml-1 py-[3px] px-[5px] text-[11px] font-bold border border-black/10 rounded-md bg-white/90 outline-none text-center"
+                      /> m
                     </label>
                     {!isSideQuest && (
-                      <label style={{ fontSize: 10, fontWeight: 600, opacity: 0.7 }}>
+                      <label className="text-[10px] font-semibold opacity-70">
                         Break
-                        <input type="number" min={0} max={60} value={customBreak}
+                        <input 
+                          type="number" min={0} max={60} value={customBreak}
                           onChange={(e) => setCustomBreak(Math.max(0, parseInt(e.target.value) || 0))}
-                          disabled={running} style={inputStyle}/> m
+                          disabled={running} 
+                          className="w-[42px] ml-1 py-[3px] px-[5px] text-[11px] font-bold border border-black/10 rounded-md bg-white/90 outline-none text-center"
+                        /> m
                       </label>
                     )}
                   </div>
                 )}
               </div>
 
-              <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", gap: 6 }}>
+              <div className="mt-auto pt-2 flex gap-1.5">
                 {phase === "idle" || phase === "done" ? (
-                  <button onClick={startQuest} disabled={!canStart}
-                    title={!activeQuest ? "Pick a quest first"
-                      : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
-                    style={{
-                      flex: 1, padding: "10px", borderRadius: 12, border: "none",
-                      background: canStart ? ringColor : "rgba(0,0,0,0.15)",
-                      color: "white", fontWeight: 700, fontSize: 12,
-                      cursor: canStart ? "pointer" : "not-allowed",
-                      boxShadow: canStart ? `0 4px 14px ${ringColor}55` : "none",
-                      transition: "all 200ms ease"
-                    }}>
+                  <button 
+                    onClick={startQuest} 
+                    disabled={!canStart}
+                    title={!activeQuest ? "Pick a quest first" : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
+                    className={`flex-1 p-2.5 rounded-xl border-none text-white font-bold text-[12px] transition-all duration-200 ${canStart ? 'cursor-pointer shadow-lg' : 'cursor-not-allowed bg-black/15 shadow-none'}`}
+                    style={{ 
+                      backgroundColor: canStart ? ringColor : undefined,
+                      boxShadow: canStart ? `0 4px 14px ${ringColor}55` : undefined
+                    }}
+                  >
                     {!activeQuest ? "Pick a quest ↖"
                       : contributingTabs.length === 0 ? "Add a trail tab ↖"
                       : `▶ Start ${activeQuest.label}`}
                   </button>
                 ) : (
                   <>
-                    {running
-                      ? <button onClick={pauseQuest}  style={controlBtn("#1F2937")}>⏸ Pause</button>
-                      : <button onClick={resumeQuest} style={controlBtn(ringColor)}>▶ Resume</button>}
-                    <button onClick={resetQuest} style={controlBtn("rgba(0,0,0,0.08)", "#1F2937")}>↺</button>
+                    <button 
+                      onClick={running ? pauseQuest : resumeQuest} 
+                      className={`flex-1 p-2.5 rounded-xl border-none text-white font-bold text-[12px] cursor-pointer ${running ? 'bg-[#1F2937]' : ''}`}
+                      style={{ backgroundColor: !running ? ringColor : undefined }}
+                    >
+                      {running ? "⏸ Pause" : "▶ Resume"}
+                    </button>
+                    <button 
+                      onClick={resetQuest} 
+                      className="flex-1 p-2.5 rounded-xl border-none font-bold text-[12px] cursor-pointer bg-black/10 text-[#1F2937]"
+                    >
+                      ↺
+                    </button>
                   </>
                 )}
               </div>
             </div>
 
             {showNudge && (
-              <div className="card" style={{ background: "linear-gradient(90deg, #FEF3C7, #FDE68A)", border: "1px solid #F59E0B", flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 3 }}>👋 Hey, gentle check-in</div>
-                <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 6 }}>
+              <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">
+                <div className="text-[11px] font-bold mb-[3px]">👋 Hey, gentle check-in</div>
+                <div className="text-[10px] opacity-80 mb-1.5">
                   Is this what you meant to be doing right now? No judgment.
                 </div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <button onClick={() => setShowNudge(false)}
-                    style={{ flex: 1, padding: "7px", borderRadius: 8, border: "none",
-                      background: "#1F2937", color: "white", fontWeight: 700, fontSize: 10, cursor: "pointer" }}>
+                <div className="flex gap-1.25">
+                  <button 
+                    onClick={() => setShowNudge(false)}
+                    className="flex-1 py-1.75 rounded-lg border-none bg-[#1F2937] text-white font-bold text-[10px] cursor-pointer"
+                  >
                     ↩ Take me back to {activeProject}
                   </button>
-                  <button onClick={() => setShowNudge(false)}
-                    style={{ padding: "7px 9px", borderRadius: 8, border: "none",
-                      background: "rgba(0,0,0,0.08)", fontSize: 10, cursor: "pointer" }}>
+                  <button 
+                    onClick={() => setShowNudge(false)}
+                    className="py-1.75 px-2.25 rounded-lg border-none bg-black/10 text-[10px] cursor-pointer"
+                  >
                     Not now
                   </button>
                 </div>
@@ -777,18 +735,6 @@ function IndexPopup() {
       )}
     </div>
   )
-}
-
-const inputStyle = {
-  width: 42, marginLeft: 4, padding: "3px 5px", fontSize: 11, fontWeight: 700,
-  border: "1px solid rgba(0,0,0,0.1)", borderRadius: 6,
-  background: "rgba(255,255,255,0.9)", outline: "none", textAlign: "center"
-}
-function controlBtn(bg, color = "white") {
-  return {
-    flex: 1, padding: "10px", borderRadius: 12, border: "none",
-    background: bg, color, fontWeight: 700, fontSize: 12, cursor: "pointer"
-  }
 }
 
 export default IndexPopup
