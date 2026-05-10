@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import "./style.css" // tailwind entrypoint
 
 const STORAGE_KEY = "focusbuddy_timer"
+const THEME_KEY = "flowstate_theme"
 
 const QUEST_TAGS = [
   { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
@@ -47,6 +48,17 @@ async function writeStore(s) {
     if (s === null) localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
+}
+async function readTheme() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(THEME_KEY)
+    return r[THEME_KEY] || "light"
+  }
+  return localStorage.getItem(THEME_KEY) || "light"
+}
+async function writeTheme(theme) {
+  if (hasChrome) await chrome.storage.local.set({ [THEME_KEY]: theme })
+  else localStorage.setItem(THEME_KEY, theme)
 }
 
 // ---- Math ----
@@ -277,6 +289,7 @@ function HeatMap({ data }) {
 function IndexPopup() {
   const [view, setView] = useState("heatmap")
   // const [timeframe, setTimeframe] = useState("24h")
+  const [theme, setTheme] = useState("light")
 
   const [activeQuest, setActiveQuest] = useState(null)
   const [goal, setGoal] = useState(MICRO_GOALS[1])
@@ -306,12 +319,16 @@ function IndexPopup() {
   const hydratedRef = useRef(false)
 
   const isSideQuest = activeQuest?.id === "sidequest"
+  const isDark = theme === "dark"
   const localWorkMins = isCustom ? customWork : goal.mins
   const localBreakMins = isSideQuest ? 0 : (isCustom ? customBreak : goal.break)
 
   // ---- Initial load + storage subscription ----
   useEffect(() => {
     let mounted = true
+    readTheme().then((savedTheme) => {
+      if (mounted) setTheme(savedTheme === "dark" ? "dark" : "light")
+    })
     const sync = async () => {
       const s = await readStore()
       if (!mounted) return
@@ -336,6 +353,12 @@ function IndexPopup() {
       }
     }
   }, [])
+
+  const toggleTheme = async () => {
+    const next = isDark ? "light" : "dark"
+    setTheme(next)
+    await writeTheme(next)
+  }
 
   // ---- Local tick ----
   useEffect(() => {
@@ -467,6 +490,9 @@ function IndexPopup() {
   const bgColor = phase === "break" ? shiftBreakColor(progress)
                 : phase === "work"  ? shiftColor(progress)
                 : "rgb(245, 247, 252)"
+  const appBackground = isDark
+    ? `linear-gradient(180deg, #101827 0%, #0B1020 72%, ${phase === "idle" ? "#111827" : bgColor} 170%)`
+    : `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)`
   const ringColor = phase === "break" ? "#0D9488" : (activeQuest?.color || "#7C5CFF")
 
   const timeLeft = formatTime(Math.max(totalSecs - liveElapsed, 0))
@@ -483,8 +509,9 @@ function IndexPopup() {
 
   return (
     <div ref={containerRef}
+      data-theme={theme}
       className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] text-base overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
-      style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}>
+      style={{ background: appBackground }}>
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.6} }
@@ -523,6 +550,49 @@ function IndexPopup() {
           margin-top:2px; font-size:0.875rem; font-weight:650;
           color:rgba(31,41,55,0.62); letter-spacing:0;
         }
+        .theme-toggle {
+          border:1px solid rgba(17,24,39,0.08);
+          background: rgba(255,255,255,0.72);
+          color:#1F2937;
+          width:30px; height:30px; border-radius:999px;
+          display:flex; align-items:center; justify-content:center;
+          font-size:14px; cursor:pointer;
+          box-shadow: 0 4px 12px rgba(31,41,55,0.08);
+          transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
+        }
+        .theme-toggle:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(31,41,55,0.12); }
+        .theme-pill { color:#1F2937; }
+        [data-theme="dark"] { color:#E5E7EB; }
+        [data-theme="dark"] .card {
+          background: rgba(15,23,42,0.78);
+          border: 1px solid rgba(148,163,184,0.16);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+        }
+        [data-theme="dark"] .tab-row { background: rgba(30,41,59,0.72); }
+        [data-theme="dark"] .tab-contrib {
+          background: linear-gradient(90deg, rgba(20,83,45,0.68), rgba(15,23,42,0.5));
+        }
+        [data-theme="dark"] .tab-side {
+          background: linear-gradient(90deg, rgba(127,29,29,0.68), rgba(15,23,42,0.5));
+        }
+        [data-theme="dark"] .icon-btn,
+        [data-theme="dark"] .theme-toggle,
+        [data-theme="dark"] .theme-pill {
+          background: rgba(15,23,42,0.72);
+          border-color: rgba(148,163,184,0.18);
+          color:#E5E7EB;
+        }
+        [data-theme="dark"] .brand-name { color:#F8FAFC; }
+        [data-theme="dark"] .brand-subtitle { color:rgba(226,232,240,0.68); }
+        [data-theme="dark"] input {
+          background: rgba(15,23,42,0.8);
+          color:#F8FAFC;
+          border-color: rgba(148,163,184,0.24);
+        }
+        [data-theme="dark"] .text-\\[\\#1F2937\\],
+        [data-theme="dark"] .text-\\[\\#111827\\] {
+          color:#F8FAFC !important;
+        }
       `}</style>
 
       {sparkles.map((s) => <Sparkle key={s.id} x={s.x} y={s.y} />)}
@@ -544,11 +614,19 @@ function IndexPopup() {
           </div>
         </div>
         <div className="flex gap-2 items-center">
+          <button
+            type="button"
+            className="theme-toggle"
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={toggleTheme}>
+            {isDark ? "☀" : "☾"}
+          </button>
           {(phase === "work" || phase === "break") && view === "heatmap" && (
             <button className="icon-btn" onClick={() => setView("focus")}>⏱ {timeLeft}</button>
           )}
-          <div title="Other FocusBuddy users in a focus session right now"
-            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-sm font-semibold">
+          <div title="Other FlowState users in a focus session right now"
+            className="theme-pill flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-sm font-semibold">
             <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]"/>
             {bodyDouble} others focusing now
           </div>
