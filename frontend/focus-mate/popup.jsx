@@ -480,7 +480,13 @@ function IndexPopup() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question })
       })
-      const data = await response.json()
+      const responseText = await response.text()
+      let data
+      try {
+        data = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        data = { detail: responseText || "The backend returned a non-JSON response." }
+      }
       if (!response.ok) {
         throw new Error(data?.detail || "Could not get an insight yet.")
       }
