@@ -1398,6 +1398,10 @@ function IndexPopup() {
     (sum, t) => sum + t.secondsOn,
     0
   )
+  const totalDistractionSecs = sideQuestTabs.reduce(
+    (sum, t) => sum + t.secondsOn,
+    0
+  )
 
   const canStart =
     !!activeQuest &&
@@ -1560,7 +1564,7 @@ function IndexPopup() {
         ? "Focus"
         : phase === "break"
           ? "Break"
-          : "Done"
+          : ""
   const ringSub =
     phase === "idle"
       ? isSideQuest
@@ -1572,7 +1576,7 @@ function IndexPopup() {
           : "no break this round"
         : phase === "break"
           ? "rest your brain"
-          : "🎉 nice work"
+          : ""
 
   return (
     <div
@@ -1594,9 +1598,20 @@ function IndexPopup() {
           font-size:11px; background: rgba(255,255,255,0.6); transition: background 200ms ease; }
         .tab-contrib { background: linear-gradient(90deg, #DCFCE7, rgba(255,255,255,0.6)); border-left: 3px solid #34D399; }
         .tab-side    { background: linear-gradient(90deg, #FEE2E2, rgba(255,255,255,0.6)); border-left: 3px solid #EF4444; opacity: 0.9; }
-        .scroll-y { overflow-y:auto; scrollbar-width: thin; }
-        .scroll-y::-webkit-scrollbar { width: 6px; }
-        .scroll-y::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+        .scroll-y {
+          overflow-y:auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(31,41,55,0.22) transparent;
+          scroll-behavior: smooth;
+        }
+        .scroll-y::-webkit-scrollbar { width: 5px; }
+        .scroll-y::-webkit-scrollbar-track { background: transparent; }
+        .scroll-y::-webkit-scrollbar-thumb {
+          background: rgba(31,41,55,0.18);
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.45);
+        }
+        .scroll-y::-webkit-scrollbar-thumb:hover { background: rgba(31,41,55,0.32); }
         .icon-btn { border:none; background: rgba(0,0,0,0.06); padding:5px 10px; border-radius:999px;
           font-size:1rem; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
         .icon-btn:hover { background: rgba(0,0,0,0.12); }
@@ -1663,6 +1678,16 @@ function IndexPopup() {
         }
         [data-theme="dark"] .tab-side {
           background: linear-gradient(90deg, rgba(127,29,29,0.68), rgba(15,23,42,0.5));
+        }
+        [data-theme="dark"] .scroll-y {
+          scrollbar-color: rgba(203,213,225,0.28) transparent;
+        }
+        [data-theme="dark"] .scroll-y::-webkit-scrollbar-thumb {
+          background: rgba(203,213,225,0.22);
+          border-color: rgba(15,23,42,0.7);
+        }
+        [data-theme="dark"] .scroll-y::-webkit-scrollbar-thumb:hover {
+          background: rgba(203,213,225,0.38);
         }
         [data-theme="dark"] .icon-btn,
         [data-theme="dark"] .theme-toggle,
@@ -2026,7 +2051,8 @@ function IndexPopup() {
                 {sideQuestTabs.length > 0 && (
                   <>
                     <div className="text-sm font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-[0.5px]">
-                      🐇 DISTRACTIONS · stimulation, not failure
+                      x DISTRACTIONS · {formatTime(totalDistractionSecs)}{" "}
+                      invested
                     </div>
                     {sideQuestTabs.map((t) => (
                       <div key={t.id} className="tab-row tab-side">
@@ -2249,3 +2275,5 @@ function IndexPopup() {
 }
 
 export default IndexPopup
+
+
