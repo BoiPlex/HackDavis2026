@@ -34,9 +34,7 @@ class TabActivity(BaseModel):
     tabId: int
     windowId: int
 
-    url: str
     domain: str
-    title: str
 
     category: str
 
@@ -116,9 +114,7 @@ class TrackedTabSummary(BaseModel):
    model_config = ConfigDict(populate_by_name=True)
 
    tab_id: int = Field(alias="tabId")
-   url: str = Field(alias="Url")
    domain: str = Field(default="", alias="Domain")
-   title: Optional[str] = None
    category: UrlCategory = UrlCategory.OTHER
    is_active: bool = Field(default=False, alias="isActive")
    focus_seconds: int = Field(default=0, ge=0, alias="focusSeconds")
@@ -142,9 +138,7 @@ class TabSwitchSummary(BaseModel):
    model_config = ConfigDict(populate_by_name=True)
 
    tab_id: int = Field(alias="tabId")
-   url: str
    domain: str = ""
-   title: Optional[str] = None
    started_at: datetime = Field(alias="startedAt")
    ended_at: Optional[datetime] = Field(default=None, alias="endedAt")
    duration_seconds: int = Field(default=0, ge=0, alias="durationSeconds")
@@ -194,9 +188,7 @@ class ActivityEventType(str, Enum):
 
 
 class TrackedUrl(BaseModel):
-   url: str
    domain: str = ""
-   title: Optional[str] = None
    category: UrlCategory = UrlCategory.OTHER
    is_focus_url: bool = False
 

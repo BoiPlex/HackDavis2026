@@ -15,15 +15,17 @@ type StoredInput = {
   keystrokeCount: number
   scrollDelta: number
   cursorDelta: number
-  url?: string
   lastUpdate?: number
 }
 
+// URLs and page titles are intentionally NOT stored on TabMetric — they are
+// PII (browsing history). Domain alone is retained because aggregating by
+// host (e.g. github.com vs reddit.com) is what the product surfaces, and
+// it leaks far less than full URLs/titles. URLs are touched briefly to
+// extract the domain and then discarded.
 type TabMetric = {
   tabId: number
-  url: string
   domain: string
-  title: string
   isActive: boolean
   focusSeconds: number
   idleSeconds: number
@@ -185,9 +187,7 @@ const ensureTab = (tab: chrome.tabs.Tab): TabMetric | null => {
   if (!entry) {
     entry = {
       tabId: tab.id,
-      url: tab.url ?? tab.pendingUrl ?? "",
       domain: domainOf(tab.url ?? tab.pendingUrl ?? ""),
-      title: tab.title ?? "",
       isActive: tab.active ?? false,
       focusSeconds: 0,
       idleSeconds: 0,
@@ -309,11 +309,11 @@ const drainInputCounters = async () => {
   console.log("[focus-mate] drain start", {
     inputKeysFound: inputKeys,
     activeTabId,
-    activeTabUrl:
-      activeTabId !== null ? tabs.get(activeTabId)?.url : undefined,
+    activeTabDomain:
+      activeTabId !== null ? tabs.get(activeTabId)?.domain : undefined,
     tabsTracked: Array.from(tabs.values()).map((t) => ({
       id: t.tabId,
-      url: t.url,
+      domain: t.domain,
       isActive: t.isActive
     }))
   })
@@ -461,11 +461,10 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
   await ready
   const entry = ensureTab(tab)
   if (!entry) return
-  if (changeInfo.url) {
-    entry.url = changeInfo.url
-    entry.domain = domainOf(changeInfo.url)
-  }
-  if (changeInfo.title !== undefined) entry.title = changeInfo.title
+  // changeInfo.url is the only privacy-touching field we read here, and
+  // only to refresh the domain. Page title changes are intentionally
+  // ignored.
+  if (changeInfo.url) entry.domain = domainOf(changeInfo.url)
   schedulePersist()
 })
 
@@ -512,7 +511,10 @@ chrome.idle.onStateChanged.addListener(async (state) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== "claim-tab") return
   const id = sender.tab?.id ?? null
-  console.log("[focus-mate] claim-tab", { id, url: sender.tab?.url })
+  console.log("[focus-mate] claim-tab", {
+    id,
+    domain: domainOf(sender.tab?.url ?? "")
+  })
   sendResponse(id)
 })
 
@@ -530,7 +532,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       key,
       tabId,
       knownToSW: !!tab,
-      url: tab?.url ?? cur?.url,
+      domain: tab?.domain,
       cur
     })
   }
