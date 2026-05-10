@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react"
 import "./style.css" // tailwind entrypoint
 
 const STORAGE_KEY = "focusbuddy_timer"
+const USER_ID_KEY = "user-id"
+const BACKEND_URL = "http://localhost:8000"
 
 const QUEST_TAGS = [
   { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
@@ -47,6 +49,13 @@ async function writeStore(s) {
     if (s === null) localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
+}
+async function readUserId() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(USER_ID_KEY)
+    return r[USER_ID_KEY] || "anonymous"
+  }
+  return localStorage.getItem(USER_ID_KEY) || "anonymous"
 }
 
 // ---- Math ----
@@ -301,6 +310,10 @@ function IndexPopup() {
   const [newDomain, setNewDomain] = useState("")
   const [savedCount, setSavedCount] = useState(0)
   const [heatData] = useState(generateMockHeatmap())
+  const [aiQuestion, setAiQuestion] = useState("What was my biggest distraction today?")
+  const [aiAnswer, setAiAnswer] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState("")
 
   const containerRef = useRef(null)
   const hydratedRef = useRef(false)
@@ -454,6 +467,30 @@ function IndexPopup() {
     setSavedCount((c) => c + sideQuestTabs.length)
     setTabs((ts) => ts.filter((t) => t.contributing))
   }
+  const askUsageQuestion = async () => {
+    const question = aiQuestion.trim()
+    if (!question || aiLoading) return
+
+    setAiLoading(true)
+    setAiError("")
+    try {
+      const userId = await readUserId()
+      const response = await fetch(`${BACKEND_URL}/ai/usage/${encodeURIComponent(userId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.detail || "Could not get an insight yet.")
+      }
+      setAiAnswer(data.answer)
+    } catch (error) {
+      setAiError(error?.message || "Could not reach the AI coach.")
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   // ---- Display values ----
   const phase   = timer?.phase || "idle"
@@ -557,43 +594,83 @@ function IndexPopup() {
 
       {/* ============== HEATMAP (DEFAULT) ============== */}
       {view === "heatmap" && (
-        <div className="flex flex-col flex-1 min-h-0 gap-2.5">
-          <div className="card flex-1 flex flex-col min-h-0">
-            <div className="flex justify-between items-center mb-2 gap-3">
-              <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
-                📊 ACTIVITY HEAT MAP
-              </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_230px] flex-1 min-h-0 gap-2.5">
+          <div className="flex flex-col min-h-0 gap-2.5">
+            <div className="card flex-1 flex flex-col min-h-0">
+              <div className="flex justify-between items-center mb-2 gap-3">
+                <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
+                  📊 ACTIVITY HEAT MAP
+                </div>
 
-              {/* Timeframe selector */}
-              <div className="flex items-center gap-1 bg-black/[0.05] rounded-full p-0.5">
-                {TIMEFRAMES.map((tf) => {
-                  const active = timeframe === tf.id
-                  return (
-                    <button
-                      key={tf.id}
-                      onClick={() => setTimeframe(tf.id)}
-                      className={`px-2.5 py-[3px] rounded-full text-[10px] font-bold transition-colors cursor-pointer ${active ? "bg-[#1F2937] text-white" : "text-[#1F2937]/70 hover:text-[#1F2937]"}`}>
-                      {tf.label}
-                    </button>
-                  )
-                })}
-              </div>
+                {/* Timeframe selector */}
+                <div className="flex items-center gap-1 bg-black/[0.05] rounded-full p-0.5">
+                  {TIMEFRAMES.map((tf) => {
+                    const active = timeframe === tf.id
+                    return (
+                      <button
+                        key={tf.id}
+                        onClick={() => setTimeframe(tf.id)}
+                        className={`px-2.5 py-[3px] rounded-full text-[10px] font-bold transition-colors cursor-pointer ${active ? "bg-[#1F2937] text-white" : "text-[#1F2937]/70 hover:text-[#1F2937]"}`}>
+                        {tf.label}
+                      </button>
+                    )
+                  })}
+                </div>
 
-              <div className="text-[9px] opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
+                <div className="text-[9px] opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
+              </div>
+              <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
+                <HeatMap data={heatData} />
+              </div>
             </div>
-            <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
-              <HeatMap data={heatData} />
-            </div>
+
+            <button onClick={() => setView("focus")}
+              className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
+              onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
+              onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
+              {phase === "work" || phase === "break"
+                ? `▶ Resume Focus Session · ${timeLeft}`
+                : "✨ Start a Focus Session"}
+            </button>
           </div>
 
-          <button onClick={() => setView("focus")}
-            className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
-            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
-            onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
-            {phase === "work" || phase === "break"
-              ? `▶ Resume Focus Session · ${timeLeft}`
-              : "✨ Start a Focus Session"}
-          </button>
+          <div className="card flex flex-col min-h-0">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
+                AI USAGE COACH
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiQuestion("Summarize my focus patterns and give me one recommendation.")}
+                className="icon-btn">
+                Suggest
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 shrink-0">
+              <textarea
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && askUsageQuestion()}
+                placeholder="Ask about your usage..."
+                className="w-full h-[74px] resize-none px-3 py-2 text-[11px] leading-snug border border-black/10 rounded-lg bg-white/85 outline-none box-border"/>
+              <button
+                type="button"
+                onClick={askUsageQuestion}
+                disabled={aiLoading || !aiQuestion.trim()}
+                className={`w-full px-3 py-2 rounded-lg border-0 text-white text-[11px] font-bold ${aiLoading || !aiQuestion.trim() ? "bg-black/15 cursor-not-allowed" : "bg-[#1F2937] cursor-pointer"}`}>
+                {aiLoading ? "Thinking..." : "Ask"}
+              </button>
+            </div>
+            <div className={`mt-2 flex-1 min-h-0 px-3 py-2 rounded-lg text-[11px] leading-relaxed border scroll-y whitespace-pre-wrap ${aiError ? "bg-red-50 border-red-200 text-red-700" : "bg-white/85 border-black/10 text-[#1F2937]"}`}>
+              {aiLoading ? (
+                <span className="opacity-60">Reading your recent activity...</span>
+              ) : aiError || aiAnswer ? (
+                aiError || aiAnswer
+              ) : (
+                <span className="opacity-55">Ask a question to see personalized usage insight here.</span>
+              )}
+              </div>
+          </div>
         </div>
       )}
 

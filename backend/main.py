@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from bson import ObjectId
 from db import db
 from models import *
 
@@ -40,6 +41,38 @@ async def ai_summary(payload: dict):
     """
 
     return await ask_backboard(message)
+
+@app.post("/ai/usage/{userId}")
+async def ai_usage_question(userId: str, payload: dict = Body(default_factory=dict)):
+    question = payload.get("question") or "Give me a concise insight about my recent usage."
+    logs = await db.activity_logs.find({"userId": userId}).sort("timestamp", -1).to_list(length=20)
+    logs = [serialize_doc(log) for log in logs]
+
+    if not logs:
+        raise HTTPException(status_code=404, detail="No activity logs found for this user yet.")
+
+    message = f"""
+    You are a concise productivity coach for a browser activity tracker.
+    Answer the user's question using only the activity logs below.
+    Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, and scrolling when relevant.
+    If the logs do not contain enough evidence, say what data is missing.
+
+    User question:
+    {question}
+
+    Recent activity logs for user {userId}:
+    {logs}
+    """
+
+    response = await ask_backboard(message)
+    return {
+        "userId": userId,
+        "question": question,
+        "logCount": len(logs),
+        "answer": response["content"],
+        "thread_id": response["thread_id"],
+        "assistant_id": response["assistant_id"],
+    }
 
 # --- Users ---
 
@@ -118,7 +151,15 @@ async def post_activity_log(userId: str, snapshot: dict = Body(default_factory=d
     return {"message": "Successfully added activity log"}
 
 # --- Helpers ---
-    
+
+def serialize_mongo_document(value):
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, list):
+        return [serialize_mongo_document(item) for item in value]
+    if isinstance(value, dict):
+        return {key: serialize_mongo_document(item) for key, item in value.items()}
+    return value
+
 def serialize_doc(doc):
-    doc["_id"] = str(doc["_id"])
-    return doc
+    return serialize_mongo_document(doc)
