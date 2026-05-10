@@ -3,19 +3,21 @@ import "./style.css" // tailwind entrypoint
 import { useEffect, useRef, useState } from "react"
 
 const STORAGE_KEY = "focusbuddy_timer"
+const THEME_KEY = "flowstate_theme"
+const MICRO_GOAL_KEY = "flowstate_micro_goal"
 const BACKEND_URL = "http://localhost:8000"
 const PRODUCTIVE_CATEGORIES = new Set(["school", "work", "productive"])
 const SUMMARY_MIN_WORK_SECS = 5 * 60
 
 const QUEST_TAGS = [
-  { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
-  { id: "work",      label: "💼 Work",       color: "#34D399" },
+  { id: "research", label: "🔍 Research", color: "#7C5CFF" },
+  { id: "work", label: "💼 Work", color: "#34D399" },
   { id: "sidequest", label: "🐇 Side Quest", color: "#EF4444" }
 ]
 
 const MICRO_GOALS = [
-  { mins: 5,  break: 2,  label: "Tiny Sprint" },
-  { mins: 15, break: 5,  label: "Quick Quest" },
+  { mins: 5, break: 2, label: "Tiny Sprint" },
+  { mins: 15, break: 5, label: "Quick Quest" },
   { mins: 25, break: 10, label: "Pomodoro" },
   { mins: 45, break: 15, label: "Deep Dive" }
 ]
@@ -46,8 +48,11 @@ async function readStore() {
     const r = await chrome.storage.local.get(STORAGE_KEY)
     return r[STORAGE_KEY] || null
   }
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") }
-  catch { return null }
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")
+  } catch {
+    return null
+  }
 }
 async function writeStore(s) {
   if (hasChrome) {
@@ -58,6 +63,32 @@ async function writeStore(s) {
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
 }
+async function readTheme() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(THEME_KEY)
+    return r[THEME_KEY] || "light"
+  }
+  return localStorage.getItem(THEME_KEY) || "light"
+}
+async function writeTheme(theme) {
+  if (hasChrome) await chrome.storage.local.set({ [THEME_KEY]: theme })
+  else localStorage.setItem(THEME_KEY, theme)
+}
+async function readMicroGoal() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(MICRO_GOAL_KEY)
+    return r[MICRO_GOAL_KEY] || null
+  }
+  try {
+    return JSON.parse(localStorage.getItem(MICRO_GOAL_KEY) || "null")
+  } catch {
+    return null
+  }
+}
+async function writeMicroGoal(value) {
+  if (hasChrome) await chrome.storage.local.set({ [MICRO_GOAL_KEY]: value })
+  else localStorage.setItem(MICRO_GOAL_KEY, JSON.stringify(value))
+}
 
 async function readUserId() {
   if (!hasChrome) return null
@@ -67,7 +98,12 @@ async function readUserId() {
 
 function emptyHeatmap() {
   return Array.from({ length: 24 }, () =>
-    Array.from({ length: 12 }, () => ({ focus: 0, dist: 0, distractions: 0, longestStreak: 0 }))
+    Array.from({ length: 12 }, () => ({
+      focus: 0,
+      dist: 0,
+      distractions: 0,
+      longestStreak: 0
+    }))
   )
 }
 
@@ -83,7 +119,11 @@ function nowISO() {
 }
 
 function isValidGrid(g) {
-  return Array.isArray(g) && g.length === 24 && g.every((row) => Array.isArray(row) && row.length === 12)
+  return (
+    Array.isArray(g) &&
+    g.length === 24 &&
+    g.every((row) => Array.isArray(row) && row.length === 12)
+  )
 }
 
 function cloneGrid(grid) {
@@ -113,8 +153,9 @@ function mergeLogsIntoGrid(grid, logs) {
     const minuteOfHour = d.getMinutes()
     const b = Math.floor(minuteOfHour / 5)
     const minute = h * 60 + minuteOfHour
-    let focus = 0, dist = 0
-    for (const tab of (log.tabs || [])) {
+    let focus = 0,
+      dist = 0
+    for (const tab of log.tabs || []) {
       const secs = tab.focusSeconds || 0
       if (PRODUCTIVE_CATEGORIES.has(tab.category)) focus += secs
       else dist += secs
@@ -126,7 +167,8 @@ function mergeLogsIntoGrid(grid, logs) {
   }
 
   todays.sort((a, b) => a.minute - b.minute)
-  let runMin = -1, prevMin = -2
+  let runMin = -1,
+    prevMin = -2
   const flush = () => {
     if (runMin < 0) return
     const len = prevMin - runMin + 1
@@ -141,7 +183,8 @@ function mergeLogsIntoGrid(grid, logs) {
         prevMin = m.minute
       } else {
         flush()
-        runMin = m.minute; prevMin = m.minute
+        runMin = m.minute
+        prevMin = m.minute
       }
     } else {
       flush()
@@ -155,19 +198,25 @@ function mergeLogsIntoGrid(grid, logs) {
 function elapsedSecs(s) {
   if (!s?.startedAt) return 0
   const ref = s.pausedAt ?? Date.now()
-  return Math.max(0, Math.floor((ref - s.startedAt - (s.accumulatedPaused || 0)) / 1000))
+  return Math.max(
+    0,
+    Math.floor((ref - s.startedAt - (s.accumulatedPaused || 0)) / 1000)
+  )
 }
 function shiftColor(p) {
-  const a = { r: 219, g: 234, b: 254 }, b = { r: 76, g: 29, b: 149 }
-  return `rgb(${Math.round(a.r+(b.r-a.r)*p)}, ${Math.round(a.g+(b.g-a.g)*p)}, ${Math.round(a.b+(b.b-a.b)*p)})`
+  const a = { r: 219, g: 234, b: 254 },
+    b = { r: 76, g: 29, b: 149 }
+  return `rgb(${Math.round(a.r + (b.r - a.r) * p)}, ${Math.round(a.g + (b.g - a.g) * p)}, ${Math.round(a.b + (b.b - a.b) * p)})`
 }
 function shiftBreakColor(p) {
-  const a = { r: 209, g: 250, b: 229 }, b = { r: 13, g: 148, b: 136 }
-  return `rgb(${Math.round(a.r+(b.r-a.r)*p)}, ${Math.round(a.g+(b.g-a.g)*p)}, ${Math.round(a.b+(b.b-a.b)*p)})`
+  const a = { r: 209, g: 250, b: 229 },
+    b = { r: 13, g: 148, b: 136 }
+  return `rgb(${Math.round(a.r + (b.r - a.r) * p)}, ${Math.round(a.g + (b.g - a.g) * p)}, ${Math.round(a.b + (b.b - a.b) * p)})`
 }
 function formatTime(secs) {
-  const m = Math.floor(secs/60), s = secs%60
-  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+  const m = Math.floor(secs / 60),
+    s = secs % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
 function formatCellTime(hourIndex, bucketIndex) {
@@ -182,21 +231,37 @@ function generateMockHeatmap() {
   for (let h = 0; h < 24; h++) {
     const row = []
     for (let b = 0; b < 12; b++) {
-      let focus = 0, dist = 0
-      if (h >= 9 && h <= 12)        { focus = Math.random() * 280 + 50; dist = Math.random() * 60 }
-      else if (h >= 13 && h <= 17)  { focus = Math.random() * 240 + 30; dist = Math.random() * 90 }
-      else if (h >= 20 && h <= 23)  { focus = Math.random() * 60;        dist = Math.random() * 200 + 60 }
-      else if (h >= 7 && h <= 8)    { focus = Math.random() * 120;       dist = Math.random() * 80 }
-      else                           { focus = Math.random() * 30;        dist = Math.random() * 30 }
-      if (Math.random() < 0.15) { focus *= 0.2; dist *= 1.4 }
+      let focus = 0,
+        dist = 0
+      if (h >= 9 && h <= 12) {
+        focus = Math.random() * 280 + 50
+        dist = Math.random() * 60
+      } else if (h >= 13 && h <= 17) {
+        focus = Math.random() * 240 + 30
+        dist = Math.random() * 90
+      } else if (h >= 20 && h <= 23) {
+        focus = Math.random() * 60
+        dist = Math.random() * 200 + 60
+      } else if (h >= 7 && h <= 8) {
+        focus = Math.random() * 120
+        dist = Math.random() * 80
+      } else {
+        focus = Math.random() * 30
+        dist = Math.random() * 30
+      }
+      if (Math.random() < 0.15) {
+        focus *= 0.2
+        dist *= 1.4
+      }
 
-      const offTrailHits  = Math.floor(dist / 35)
-      const idleBlips     = Math.random() < 0.4 ? Math.floor(Math.random() * 3) : 0
-      const distractions  = offTrailHits + idleBlips
+      const offTrailHits = Math.floor(dist / 35)
+      const idleBlips = Math.random() < 0.4 ? Math.floor(Math.random() * 3) : 0
+      const distractions = offTrailHits + idleBlips
       // longest contiguous focus streak in MINUTES (uses focus magnitude as a proxy)
-      const longestStreak = focus > 80
-        ? Math.max(3, Math.floor((focus / 60) * 0.8 + Math.random() * 6))
-        : Math.floor(Math.random() * 3)
+      const longestStreak =
+        focus > 80
+          ? Math.max(3, Math.floor((focus / 60) * 0.8 + Math.random() * 6))
+          : Math.floor(Math.random() * 3)
 
       row.push({
         focus: Math.round(focus),
@@ -214,9 +279,9 @@ function heatColor(cell, maxTotal) {
   const total = cell.focus + cell.dist
   if (total < 4) return "rgba(0,0,0,0.04)"
   const ratio = cell.focus / total
-  const r = Math.round(59  * ratio + 245 * (1 - ratio))
+  const r = Math.round(59 * ratio + 245 * (1 - ratio))
   const g = Math.round(130 * ratio + 158 * (1 - ratio))
-  const b = Math.round(246 * ratio +  11 * (1 - ratio))
+  const b = Math.round(246 * ratio + 11 * (1 - ratio))
   const a = 0.18 + Math.min(1, total / maxTotal) * 0.82
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
@@ -232,7 +297,15 @@ function Sparkle({ x, y }) {
   )
 }
 
-function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subLabel, mode }) {
+function HeroRing({
+  progress,
+  size = 170,
+  stroke = 14,
+  color,
+  primaryLabel,
+  subLabel,
+  mode
+}) {
   const radius = (size - stroke) / 2
   const C = 2 * Math.PI * radius
   const offset = C - progress * C
@@ -252,18 +325,31 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
             <stop offset="100%" stopColor={color} stopOpacity="0.5" />
           </linearGradient>
         </defs>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="rgba(255,255,255,0.55)" strokeWidth={stroke} fill="transparent"/>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
-          strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
-          className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
-        />
+        {progress > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="url(#ringGrad)"
+            strokeWidth={stroke}
+            fill="transparent"
+            strokeDasharray={C}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1F2937]">
-        <div className="text-sm opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
-        <div className="text-[32px] font-extrabold leading-none mt-0.5 tabular-nums">{primaryLabel}</div>
-        <div className="text-sm opacity-60 mt-[3px] text-center px-2.5">{subLabel}</div>
+        <div className="text-sm opacity-60 font-bold tracking-[2px] uppercase">
+          {mode}
+        </div>
+        <div className="text-[32px] font-extrabold leading-none mt-0.5 tabular-nums">
+          {primaryLabel}
+        </div>
+        <div className="text-sm opacity-60 mt-[3px] text-center px-2.5">
+          {subLabel}
+        </div>
       </div>
     </div>
   )
@@ -272,23 +358,23 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
 function HeatMap({ data }) {
   const [selected, setSelected] = useState(null) // { h, b, focus, dist, distractions, longestStreak }
   const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
-  const HOURS = 24, BUCKETS = 12
+  const HOURS = 24,
+    BUCKETS = 12
 
   return (
     <div className="w-full flex flex-col">
-
       {/* ===== Legend (TOP) ===== */}
       <div className="flex items-center justify-center gap-4 mb-2 text-sm opacity-80">
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm"/>
+          <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm" />
           <span>Deep focus</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-[rgba(245,158,11,0.85)] rounded-sm"/>
+          <div className="w-4 h-2.5 bg-[rgba(245,158,11,0.85)] rounded-sm" />
           <span>Tab-switching / scrolling</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-black/[0.06] rounded-sm"/>
+          <div className="w-4 h-2.5 bg-black/[0.06] rounded-sm" />
           <span>Quiet</span>
         </div>
       </div>
@@ -299,24 +385,28 @@ function HeatMap({ data }) {
         <div
           className="flex items-center justify-center pr-1 select-none"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-          <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">Minutes</span>
+          <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">
+            Minutes
+          </span>
         </div>
 
         <div className="flex-1">
           {/* Grid rows */}
           {Array.from({ length: BUCKETS }).map((_, b) => (
-            <div key={b}
+            <div
+              key={b}
               className="grid gap-[2px] mb-0.5"
               style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
               {/* Y-axis numbers — increment by 3 up to 12 (rows 2,5,8,11 → 3,6,9,12) */}
               <div className="text-sm opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
-                {((b + 1) % 3 === 0) ? `${b + 1}` : ""}
+                {(b + 1) % 3 === 0 ? `${b + 1}` : ""}
               </div>
               {Array.from({ length: HOURS }).map((_, h) => {
                 const cell = data[h][b]
                 const isSelected = selected?.h === h && selected?.b === b
                 return (
-                  <button key={h}
+                  <button
+                    key={h}
                     type="button"
                     onClick={() => setSelected({ h, b, ...cell })}
                     title="Click for details"
@@ -334,7 +424,8 @@ function HeatMap({ data }) {
             style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
             <div />
             {Array.from({ length: HOURS }).map((_, h) => (
-              <div key={h}
+              <div
+                key={h}
                 className={`text-sm opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
                 {h + 1}
               </div>
@@ -357,7 +448,8 @@ function HeatMap({ data }) {
             </span>
             <span className="opacity-75">
               Distracted{" "}
-              <span className={`font-extrabold ${selected.distractions > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+              <span
+                className={`font-extrabold ${selected.distractions > 0 ? "text-amber-600" : "text-emerald-600"}`}>
                 {selected.distractions}
               </span>{" "}
               {selected.distractions === 1 ? "time" : "times"}
@@ -385,12 +477,14 @@ function HeatMap({ data }) {
 function IndexPopup() {
   const [view, setView] = useState("heatmap")
   // const [timeframe, setTimeframe] = useState("24h")
+  const [theme, setTheme] = useState("light")
 
   const [activeQuest, setActiveQuest] = useState(null)
   const [goal, setGoal] = useState(MICRO_GOALS[1])
   const [isCustom, setIsCustom] = useState(false)
   const [customWork, setCustomWork] = useState(20)
   const [customBreak, setCustomBreak] = useState(7)
+  const [pendingMicroGoal, setPendingMicroGoal] = useState(null)
 
   const [timer, setTimer] = useState(null)
   const [, force] = useState(0)
@@ -401,10 +495,42 @@ function IndexPopup() {
   const [activeProject] = useState("Deep Work")
 
   const [tabs, setTabs] = useState([
-    { id: 1, title: "Google: react hooks tutorial", url: "google.com",       contributing: false, visits: 3, secondsOn: 124, friction: 0.1 },
-    { id: 2, title: "useEffect docs",                url: "react.dev",         contributing: false, visits: 5, secondsOn: 312, friction: 0.2 },
-    { id: 3, title: "Stack Overflow: cleanup",       url: "stackoverflow.com", contributing: false, visits: 2, secondsOn: 88,  friction: 0.3 },
-    { id: 4, title: "Reddit r/programming",          url: "reddit.com",        contributing: false, visits: 8, secondsOn: 540, friction: 0.92 }
+    {
+      id: 1,
+      title: "Google: react hooks tutorial",
+      url: "google.com",
+      contributing: false,
+      visits: 3,
+      secondsOn: 124,
+      friction: 0.1
+    },
+    {
+      id: 2,
+      title: "useEffect docs",
+      url: "react.dev",
+      contributing: false,
+      visits: 5,
+      secondsOn: 312,
+      friction: 0.2
+    },
+    {
+      id: 3,
+      title: "Stack Overflow: cleanup",
+      url: "stackoverflow.com",
+      contributing: false,
+      visits: 2,
+      secondsOn: 88,
+      friction: 0.3
+    },
+    {
+      id: 4,
+      title: "Reddit r/programming",
+      url: "reddit.com",
+      contributing: false,
+      visits: 8,
+      secondsOn: 540,
+      friction: 0.92
+    }
   ])
   const [newDomain, setNewDomain] = useState("")
   const [savedCount, setSavedCount] = useState(0)
@@ -413,15 +539,41 @@ function IndexPopup() {
   const containerRef = useRef(null)
   const hydratedRef = useRef(false)
   const settingsLoadedRef = useRef(false)
-  const heatmapCacheRef = useRef({ grid: emptyHeatmap(), lastTimestamp: null, date: null })
+  const heatmapCacheRef = useRef({
+    grid: emptyHeatmap(),
+    lastTimestamp: null,
+    date: null
+  })
 
   const isSideQuest = activeQuest?.id === "sidequest"
+  const isDark = theme === "dark"
+  const hasPausedTimer =
+    !!timer?.pausedAt && (timer.phase === "work" || timer.phase === "break")
   const localWorkMins = isCustom ? customWork : goal.mins
-  const localBreakMins = isSideQuest ? 0 : (isCustom ? customBreak : goal.break)
+  const localBreakMins = isSideQuest ? 0 : isCustom ? customBreak : goal.break
 
   // ---- Initial load + storage subscription ----
   useEffect(() => {
     let mounted = true
+    readTheme().then((savedTheme) => {
+      if (mounted) setTheme(savedTheme === "dark" ? "dark" : "light")
+    })
+    readMicroGoal().then((savedGoal) => {
+      if (!mounted || !savedGoal) return
+      if (savedGoal.isCustom) {
+        setIsCustom(true)
+        setCustomWork(savedGoal.customWork || 20)
+        setCustomBreak(savedGoal.customBreak ?? 7)
+        return
+      }
+      const savedPreset = MICRO_GOALS.find(
+        (g) => g.mins === savedGoal.mins && g.break === savedGoal.break
+      )
+      if (savedPreset) {
+        setGoal(savedPreset)
+        setIsCustom(false)
+      }
+    })
     const sync = async () => {
       const s = await readStore()
       if (!mounted) return
@@ -447,18 +599,137 @@ function IndexPopup() {
     }
   }, [])
 
+  const toggleTheme = async () => {
+    const next = isDark ? "light" : "dark"
+    setTheme(next)
+    await writeTheme(next)
+  }
+  const applyMicroGoal = async (selection) => {
+    const nextWork = selection.isCustom
+      ? selection.customWork
+      : selection.goal.mins
+    const nextBreak = isSideQuest
+      ? 0
+      : selection.isCustom
+        ? selection.customBreak
+        : selection.goal.break
+
+    if (selection.isCustom) {
+      setIsCustom(true)
+      setCustomWork(nextWork)
+      setCustomBreak(nextBreak)
+      await writeMicroGoal({
+        isCustom: true,
+        customWork: nextWork,
+        customBreak: nextBreak
+      })
+    } else {
+      setGoal(selection.goal)
+      setIsCustom(false)
+      await writeMicroGoal({
+        isCustom: false,
+        mins: selection.goal.mins,
+        break: selection.goal.break
+      })
+    }
+
+    if (hasPausedTimer) {
+      const nextTimer = {
+        ...timer,
+        phase: "done",
+        startedAt: null,
+        pausedAt: null,
+        accumulatedPaused: 0,
+        workSecs: nextWork * 60,
+        breakSecs: nextBreak * 60,
+        hasBreak: !isSideQuest
+      }
+      await writeStore(nextTimer)
+      setTimer(nextTimer)
+    }
+
+    setPendingMicroGoal(null)
+  }
+  const chooseMicroGoal = async (nextGoal) => {
+    const selection = {
+      isCustom: false,
+      goal: nextGoal,
+      label: `${nextGoal.mins}m${isSideQuest ? "" : ` + ${nextGoal.break}m break`}`
+    }
+    if (hasPausedTimer) {
+      setPendingMicroGoal(selection)
+      return
+    }
+    await applyMicroGoal(selection)
+  }
+  const chooseCustomGoal = async () => {
+    setIsCustom(true)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork,
+        customBreak,
+        label: `${customWork}m${isSideQuest ? "" : ` + ${customBreak}m break`}`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork, customBreak })
+  }
+  const updateCustomWork = async (value) => {
+    const next = Math.max(1, parseInt(value) || 1)
+    setCustomWork(next)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork: next,
+        customBreak,
+        label: `${next}m${isSideQuest ? "" : ` + ${customBreak}m break`}`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork: next, customBreak })
+  }
+  const updateCustomBreak = async (value) => {
+    const next = Math.max(0, parseInt(value) || 0)
+    setCustomBreak(next)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork,
+        customBreak: next,
+        label: `${customWork}m + ${next}m break`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork, customBreak: next })
+  }
+
   // ---- Local tick ----
   useEffect(() => {
     const id = setInterval(async () => {
       const s = await readStore()
-      if (!s) { setTimer(null); force((t) => t + 1); return }
-      if (s.startedAt && !s.pausedAt && (s.phase === "work" || s.phase === "break")) {
+      if (!s) {
+        setTimer(null)
+        force((t) => t + 1)
+        return
+      }
+      if (
+        s.startedAt &&
+        !s.pausedAt &&
+        (s.phase === "work" || s.phase === "break")
+      ) {
         const total = s.phase === "work" ? s.workSecs : s.breakSecs
         const e = elapsedSecs(s)
         if (e >= total) {
           let next
           if (s.phase === "work" && s.hasBreak && s.breakSecs > 0) {
-            next = { ...s, phase: "break", startedAt: Date.now(), accumulatedPaused: 0, pausedAt: null }
+            next = {
+              ...s,
+              phase: "break",
+              startedAt: Date.now(),
+              accumulatedPaused: 0,
+              pausedAt: null
+            }
           } else {
             next = { ...s, phase: "done", startedAt: null, pausedAt: null }
           }
@@ -510,7 +781,9 @@ function IndexPopup() {
               heatmap: { date: todayKey(), grid: newGrid, lastTimestamp: null }
             })
           })
-        } catch (e) { console.warn("heatmap save failed", e) }
+        } catch (e) {
+          console.warn("heatmap save failed", e)
+        }
       } catch (e) {
         console.warn("heatmap fetch failed", e)
       }
@@ -518,7 +791,10 @@ function IndexPopup() {
 
     const init = async () => {
       const userId = await readUserId()
-      if (!userId) { settingsLoadedRef.current = true; return }
+      if (!userId) {
+        settingsLoadedRef.current = true
+        return
+      }
 
       try {
         const res = await fetch(`${BACKEND_URL}/users/${userId}`)
@@ -543,10 +819,17 @@ function IndexPopup() {
           }
           setHeatData(cached.grid)
         } else {
-          heatmapCacheRef.current = { grid: emptyHeatmap(), lastTimestamp: null, date: today }
+          heatmapCacheRef.current = {
+            grid: emptyHeatmap(),
+            lastTimestamp: null,
+            date: today
+          }
         }
-      } catch (e) { console.warn("user fetch failed", e) }
-      finally { settingsLoadedRef.current = true }
+      } catch (e) {
+        console.warn("user fetch failed", e)
+      } finally {
+        settingsLoadedRef.current = true
+      }
 
       if (!mounted) return
       await fetchHeat(userId)
@@ -580,7 +863,9 @@ function IndexPopup() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ settings })
         })
-      } catch (e) { console.warn("settings save failed", e) }
+      } catch (e) {
+        console.warn("settings save failed", e)
+      }
     }, 500)
     return () => clearTimeout(id)
   }, [activeQuest, goal, isCustom, customWork, customBreak, savedCount, view])
@@ -602,19 +887,28 @@ function IndexPopup() {
     setTimeout(() => setSparkles((s) => s.filter((sp) => sp.id !== id)), 700)
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const o = ctx.createOscillator(); const g = ctx.createGain()
-      o.connect(g); g.connect(ctx.destination)
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.connect(g)
+      g.connect(ctx.destination)
       o.frequency.value = 880
       g.gain.setValueAtTime(0.05, ctx.currentTime)
       g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15)
-      o.start(); o.stop(ctx.currentTime + 0.15)
+      o.start()
+      o.stop(ctx.currentTime + 0.15)
     } catch {}
   }
-  const pickQuest = (q, e) => { setActiveQuest(q); triggerReward(e) }
+  const pickQuest = (q, e) => {
+    setActiveQuest(q)
+    triggerReward(e)
+  }
 
   const contributingTabs = tabs.filter((t) => t.contributing)
-  const sideQuestTabs    = tabs.filter((t) => !t.contributing)
-  const totalContributingSecs = contributingTabs.reduce((sum, t) => sum + t.secondsOn, 0)
+  const sideQuestTabs = tabs.filter((t) => !t.contributing)
+  const totalContributingSecs = contributingTabs.reduce(
+    (sum, t) => sum + t.secondsOn,
+    0
+  )
 
   const canStart =
     !!activeQuest &&
@@ -639,16 +933,20 @@ function IndexPopup() {
   const pauseQuest = async () => {
     if (!timer || timer.pausedAt) return
     const next = { ...timer, pausedAt: Date.now() }
-    await writeStore(next); setTimer(next)
+    await writeStore(next)
+    setTimer(next)
   }
   const resumeQuest = async () => {
     if (!timer || !timer.pausedAt) return
+    setPendingMicroGoal(null)
     const next = {
       ...timer,
-      accumulatedPaused: (timer.accumulatedPaused || 0) + (Date.now() - timer.pausedAt),
+      accumulatedPaused:
+        (timer.accumulatedPaused || 0) + (Date.now() - timer.pausedAt),
       pausedAt: null
     }
-    await writeStore(next); setTimer(next)
+    await writeStore(next)
+    setTimer(next)
   }
   const resetQuest = async () => {
     setAiSummary(null)
@@ -665,7 +963,9 @@ function IndexPopup() {
       const res = await fetch(`${BACKEND_URL}/activity/${userId}`)
       const { logs } = await res.json()
       const sessionStart = timer?.startedAt
-        ? new Date(timer.startedAt - (timer.workSecs + (timer.breakSecs || 0)) * 1000)
+        ? new Date(
+            timer.startedAt - (timer.workSecs + (timer.breakSecs || 0)) * 1000
+          )
         : new Date(Date.now() - 60 * 60 * 1000)
       const sessionLogs = (logs || []).filter(
         (l) => new Date(l.timestamp) >= sessionStart
@@ -691,14 +991,25 @@ function IndexPopup() {
   }
 
   const toggleContributing = (id) =>
-    setTabs((ts) => ts.map((t) => t.id === id ? { ...t, contributing: !t.contributing } : t))
+    setTabs((ts) =>
+      ts.map((t) => (t.id === id ? { ...t, contributing: !t.contributing } : t))
+    )
   const addTrailDomain = () => {
-    const v = newDomain.trim(); if (!v) return
+    const v = newDomain.trim()
+    if (!v) return
     const cleaned = v.replace(/^https?:\/\//, "").replace(/\/$/, "")
-    setTabs((ts) => [...ts, {
-      id: Date.now(), title: cleaned, url: cleaned,
-      contributing: true, visits: 0, secondsOn: 0, friction: 0.1
-    }])
+    setTabs((ts) => [
+      ...ts,
+      {
+        id: Date.now(),
+        title: cleaned,
+        url: cleaned,
+        contributing: true,
+        visits: 0,
+        secondsOn: 0,
+        friction: 0.1
+      }
+    ])
     setNewDomain("")
   }
   const brainDump = () => {
@@ -707,37 +1018,64 @@ function IndexPopup() {
   }
 
   // ---- Display values ----
-  const phase   = timer?.phase || "idle"
-  const running = !!timer?.startedAt && !timer?.pausedAt && (phase === "work" || phase === "break")
+  const phase = timer?.phase || "idle"
+  const running =
+    !!timer?.startedAt &&
+    !timer?.pausedAt &&
+    (phase === "work" || phase === "break")
   const liveElapsed = timer ? elapsedSecs(timer) : 0
 
-  const displayWorkTotal  = (phase === "work" || phase === "break") ? timer.workSecs  : localWorkMins  * 60
-  const displayBreakTotal = (phase === "work" || phase === "break") ? timer.breakSecs : localBreakMins * 60
+  const displayWorkTotal =
+    phase === "work" || phase === "break" ? timer.workSecs : localWorkMins * 60
+  const displayBreakTotal =
+    phase === "work" || phase === "break"
+      ? timer.breakSecs
+      : localBreakMins * 60
   const totalSecs = phase === "break" ? displayBreakTotal : displayWorkTotal
   const progress = totalSecs > 0 ? Math.min(liveElapsed / totalSecs, 1) : 0
-  const bgColor = phase === "break" ? shiftBreakColor(progress)
-                : phase === "work"  ? shiftColor(progress)
-                : "rgb(245, 247, 252)"
-  const ringColor = phase === "break" ? "#0D9488" : (activeQuest?.color || "#7C5CFF")
+  const bgColor =
+    phase === "break"
+      ? shiftBreakColor(progress)
+      : phase === "work"
+        ? shiftColor(progress)
+        : "rgb(245, 247, 252)"
+  const appBackground = isDark
+    ? `linear-gradient(180deg, #101827 0%, #0B1020 72%, ${phase === "idle" ? "#111827" : bgColor} 170%)`
+    : `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)`
+  const ringColor =
+    phase === "break" ? "#0D9488" : activeQuest?.color || "#7C5CFF"
 
   const timeLeft = formatTime(Math.max(totalSecs - liveElapsed, 0))
   const ringMode =
-    phase === "idle"  ? "Ready" :
-    phase === "work"  ? "Focus" :
-    phase === "break" ? "Break" : "Done"
+    phase === "idle"
+      ? "Ready"
+      : phase === "work"
+        ? "Focus"
+        : phase === "break"
+          ? "Break"
+          : "Done"
   const ringSub =
     phase === "idle"
-      ? (isSideQuest ? `${localWorkMins}m · no break` : `${localWorkMins}m focus · ${localBreakMins}m break`)
-      : phase === "work"  ? (timer?.hasBreak && timer?.breakSecs > 0 ? `then ${Math.round(timer.breakSecs/60)}m break` : "no break this round")
-      : phase === "break" ? "rest your brain"
-      : "🎉 nice work"
+      ? isSideQuest
+        ? `${localWorkMins}m · no break`
+        : `${localWorkMins}m focus · ${localBreakMins}m break`
+      : phase === "work"
+        ? timer?.hasBreak && timer?.breakSecs > 0
+          ? `then ${Math.round(timer.breakSecs / 60)}m break`
+          : "no break this round"
+        : phase === "break"
+          ? "rest your brain"
+          : "🎉 nice work"
 
-  const summaryEligible = phase === "done" && (timer?.workSecs || 0) >= SUMMARY_MIN_WORK_SECS
+  const summaryEligible =
+    phase === "done" && (timer?.workSecs || 0) >= SUMMARY_MIN_WORK_SECS
 
   return (
-    <div ref={containerRef}
+    <div
+      ref={containerRef}
+      data-theme={theme}
       className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] text-base overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
-      style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}>
+      style={{ background: appBackground }}>
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.6} }
@@ -776,33 +1114,93 @@ function IndexPopup() {
           margin-top:2px; font-size:0.875rem; font-weight:650;
           color:rgba(31,41,55,0.62); letter-spacing:0;
         }
+        .theme-toggle {
+          border:1px solid rgba(17,24,39,0.08);
+          background: rgba(255,255,255,0.72);
+          color:#1F2937;
+          width:30px; height:30px; border-radius:999px;
+          display:flex; align-items:center; justify-content:center;
+          font-size:14px; cursor:pointer;
+          box-shadow: 0 4px 12px rgba(31,41,55,0.08);
+          transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
+        }
+        .theme-toggle:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(31,41,55,0.12); }
+        .theme-pill { color:#1F2937; }
+        [data-theme="dark"] { color:#E5E7EB; }
+        [data-theme="dark"] .card {
+          background: rgba(15,23,42,0.78);
+          border: 1px solid rgba(148,163,184,0.16);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+        }
+        [data-theme="dark"] .tab-row { background: rgba(30,41,59,0.72); }
+        [data-theme="dark"] .tab-contrib {
+          background: linear-gradient(90deg, rgba(20,83,45,0.68), rgba(15,23,42,0.5));
+        }
+        [data-theme="dark"] .tab-side {
+          background: linear-gradient(90deg, rgba(127,29,29,0.68), rgba(15,23,42,0.5));
+        }
+        [data-theme="dark"] .icon-btn,
+        [data-theme="dark"] .theme-toggle,
+        [data-theme="dark"] .theme-pill {
+          background: rgba(15,23,42,0.72);
+          border-color: rgba(148,163,184,0.18);
+          color:#E5E7EB;
+        }
+        [data-theme="dark"] .brand-name { color:#F8FAFC; }
+        [data-theme="dark"] .brand-subtitle { color:rgba(226,232,240,0.68); }
+        [data-theme="dark"] input {
+          background: rgba(15,23,42,0.8);
+          color:#F8FAFC;
+          border-color: rgba(148,163,184,0.24);
+        }
+        [data-theme="dark"] .text-\\[\\#1F2937\\],
+        [data-theme="dark"] .text-\\[\\#111827\\] {
+          color:#F8FAFC !important;
+        }
       `}</style>
 
-      {sparkles.map((s) => <Sparkle key={s.id} x={s.x} y={s.y} />)}
+      {sparkles.map((s) => (
+        <Sparkle key={s.id} x={s.x} y={s.y} />
+      ))}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-2.5 shrink-0">
         <div className="flex items-center gap-2.5">
           {view === "focus" && (
-            <button className="icon-btn" onClick={() => setView("heatmap")}>← Back</button>
+            <button className="icon-btn" onClick={() => setView("heatmap")}>
+              ← Back
+            </button>
           )}
           <div className="brand-lockup">
             <div className="brand-mark">💡</div>
             <div>
               <div className="brand-name">FlowState</div>
               <div className="brand-subtitle">
-                {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
+                {view === "heatmap"
+                  ? "Today's focus rhythm"
+                  : "Your supportive coach"}
               </div>
             </div>
           </div>
         </div>
         <div className="flex gap-2 items-center">
+          <button
+            type="button"
+            className="theme-toggle"
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={toggleTheme}>
+            {isDark ? "☀" : "☾"}
+          </button>
           {(phase === "work" || phase === "break") && view === "heatmap" && (
-            <button className="icon-btn" onClick={() => setView("focus")}>⏱ {timeLeft}</button>
+            <button className="icon-btn" onClick={() => setView("focus")}>
+              ⏱ {timeLeft}
+            </button>
           )}
-          <div title="Other FocusBuddy users in a focus session right now"
-            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-sm font-semibold">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]"/>
+          <div
+            title="Other FlowState users in a focus session right now"
+            className="theme-pill flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-sm font-semibold">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]" />
             {bodyDouble} others focusing now
           </div>
         </div>
@@ -832,17 +1230,22 @@ function IndexPopup() {
                 })}
               </div> */}
 
-              <div className="text-xs opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
+              <div className="text-xs opacity-[0.55] whitespace-nowrap">
+                Privacy-respecting · no URLs shown
+              </div>
             </div>
             <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
               <HeatMap data={heatData} />
             </div>
           </div>
 
-          <button onClick={() => setView("focus")}
+          <button
+            onClick={() => setView("focus")}
             className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-base cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
-            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
-            onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "scale(0.98)")
+            }
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}>
             {phase === "work" || phase === "break"
               ? `▶ Resume Focus Session · ${timeLeft}`
               : "✨ Start a Focus Session"}
@@ -864,7 +1267,8 @@ function IndexPopup() {
                   const selected = activeQuest?.id === q.id
                   const dimmed = activeQuest && !selected
                   return (
-                    <button key={q.id}
+                    <button
+                      key={q.id}
                       onClick={(e) => pickQuest(q, e)}
                       className={`quest-btn ${dimmed ? "opacity-[0.35]" : "opacity-100"} ${selected ? "outline outline-[3px] outline-black/15" : "outline-none"}`}
                       style={{ background: q.color }}>
@@ -875,7 +1279,8 @@ function IndexPopup() {
               </div>
               {isSideQuest && (
                 <div className="text-sm opacity-70 mt-[5px] italic">
-                  Side Quests are stimulation, not failure — running without a break.
+                  Side Quests are stimulation, not failure — running without a
+                  break.
                 </div>
               )}
             </div>
@@ -885,19 +1290,25 @@ function IndexPopup() {
                 <div className="text-sm font-bold opacity-[0.65] tracking-[1px]">
                   STEP 2 · 🧭 GOAL MAP
                 </div>
-                <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
+                <button
+                  onClick={brainDump}
+                  disabled={sideQuestTabs.length === 0}
                   className={`border-0 px-2 py-[3px] rounded-full text-white text-xs font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   🔥 Brain Dump ({sideQuestTabs.length})
                 </button>
               </div>
 
               <div className="flex gap-[5px] my-6 shrink-0">
-                <input value={newDomain}
+                <input
+                  value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTrailDomain()}
                   placeholder="Add a domain (e.g. react.dev)"
-                  className="flex-1 px-[9px] py-[5px] text-base border border-black/10 rounded-lg bg-white/80 outline-none"/>
-                <button onClick={addTrailDomain} disabled={!newDomain.trim()}
+                  className="flex-1 px-[9px] py-[5px] text-base border border-black/10 rounded-lg bg-white/80 outline-none"
+                />
+                <button
+                  onClick={addTrailDomain}
+                  disabled={!newDomain.trim()}
                   className={`border-0 px-[11px] py-[5px] rounded-lg text-white text-base font-bold ${newDomain.trim() ? "bg-[#1F2937] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   + Add
                 </button>
@@ -914,13 +1325,21 @@ function IndexPopup() {
                 )}
                 {contributingTabs.map((t) => (
                   <div key={t.id} className="tab-row tab-contrib">
-                    <input type="checkbox" checked={t.contributing}
-                      onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
+                    <input
+                      type="checkbox"
+                      checked={t.contributing}
+                      onChange={() => toggleContributing(t.id)}
+                      className="cursor-pointer"
+                    />
                     <div className="flex-1 overflow-hidden">
-                      <div className="truncate font-semibold text-base">{t.title}</div>
+                      <div className="truncate font-semibold text-base">
+                        {t.title}
+                      </div>
                       <div className="text-[0.875rem] opacity-60 flex gap-1.5">
-                        <span>{t.url}</span><span>·</span>
-                        <span>{t.visits} visits</span><span>·</span>
+                        <span>{t.url}</span>
+                        <span>·</span>
+                        <span>{t.visits} visits</span>
+                        <span>·</span>
                         <span>{formatTime(t.secondsOn)}</span>
                       </div>
                     </div>
@@ -934,13 +1353,21 @@ function IndexPopup() {
                     </div>
                     {sideQuestTabs.map((t) => (
                       <div key={t.id} className="tab-row tab-side">
-                        <input type="checkbox" checked={t.contributing}
-                          onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
+                        <input
+                          type="checkbox"
+                          checked={t.contributing}
+                          onChange={() => toggleContributing(t.id)}
+                          className="cursor-pointer"
+                        />
                         <div className="flex-1 overflow-hidden">
-                          <div className="truncate text-base font-semibold">{t.title}</div>
+                          <div className="truncate text-base font-semibold">
+                            {t.title}
+                          </div>
                           <div className="text-[0.875rem] opacity-60 flex gap-1.5">
-                            <span>{t.url}</span><span>·</span>
-                            <span>{t.visits} visits</span><span>·</span>
+                            <span>{t.url}</span>
+                            <span>·</span>
+                            <span>{t.visits} visits</span>
+                            <span>·</span>
                             <span>{formatTime(t.secondsOn)}</span>
                           </div>
                         </div>
@@ -951,7 +1378,8 @@ function IndexPopup() {
 
                 {savedCount > 0 && (
                   <div className="mt-1.5 text-sm opacity-70">
-                    💾 {savedCount} tab{savedCount !== 1 ? "s" : ""} saved to "Read Later"
+                    💾 {savedCount} tab{savedCount !== 1 ? "s" : ""} saved to
+                    "Read Later"
                   </div>
                 )}
               </div>
@@ -964,7 +1392,11 @@ function IndexPopup() {
               <HeroRing
                 progress={progress}
                 color={ringColor}
-                primaryLabel={phase === "idle" || phase === "done" ? formatTime(displayWorkTotal) : timeLeft}
+                primaryLabel={
+                  phase === "idle" || phase === "done"
+                    ? formatTime(displayWorkTotal)
+                    : timeLeft
+                }
                 subLabel={ringSub}
                 mode={ringMode}
               />
@@ -976,70 +1408,131 @@ function IndexPopup() {
                 {/* 4-col tracking grid lets the 4 micro-goals form a 2×2,
     while the custom button sits centered (col-start-2 col-span-2)
     below them as the bottom-middle slot. */}
-<div className="grid grid-cols-4 gap-1.5">
-  {MICRO_GOALS.map((g) => {
-    const selected = !isCustom && goal.mins === g.mins
-    return (
-      <button key={g.mins}
-        onClick={() => { setGoal(g); setIsCustom(false) }}
-        disabled={running}
-        className={`col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
-        <span className="text-[1rem]">{g.mins}m</span>
-        {!isSideQuest && (
-          <span className="text-[0.875rem] opacity-70 font-medium">+{g.break}m</span>
-        )}
-      </button>
-    )
-  })}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {MICRO_GOALS.map((g) => {
+                    const selected =
+                      pendingMicroGoal?.isCustom === false
+                        ? pendingMicroGoal.goal.mins === g.mins
+                        : !isCustom && goal.mins === g.mins
+                    return (
+                      <button
+                        key={g.mins}
+                        onClick={() => chooseMicroGoal(g)}
+                        disabled={running}
+                        className={`col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+                        <span className="text-[1rem]">{g.mins}m</span>
+                        {!isSideQuest && (
+                          <span className="text-[0.875rem] opacity-70 font-medium">
+                            +{g.break}m break
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
 
-  {/* Custom — centered under the 2×2 */}
-  <button onClick={() => setIsCustom(true)} disabled={running}
-    className={`col-start-2 col-span-2 border-0 px- py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 min-h-[38px] ${running ? "cursor-not-allowed" : "cursor-pointer"} ${isCustom ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
-    <span className="text-[1.1rem]">⚙</span>
-    <span className="text-[0.875rem] opacity-70 font-medium">custom</span>
-  </button>
-</div>
+                  {/* Custom — centered under the 2×2 */}
+                  <button
+                    onClick={chooseCustomGoal}
+                    disabled={running}
+                    className={`col-start-2 col-span-2 border-0 px- py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 min-h-[38px] ${running ? "cursor-not-allowed" : "cursor-pointer"} ${pendingMicroGoal?.isCustom || (!pendingMicroGoal && isCustom) ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+                    <span className="text-[1.1rem]">⚙</span>
+                    <span className="text-[0.875rem] opacity-70 font-medium">
+                      custom
+                    </span>
+                  </button>
+                </div>
 
                 {isCustom && (
                   <div className="flex gap-2 mt-[5px] items-center justify-center">
                     <label className="text-sm font-semibold opacity-70">
                       Work
-                      <input type="number" min={1} max={180} value={customWork}
-                        onChange={(e) => setCustomWork(Math.max(1, parseInt(e.target.value) || 1))}
-                        disabled={running} className={inputClasses}/> m
+                      <input
+                        type="number"
+                        min={1}
+                        max={180}
+                        value={customWork}
+                        onChange={(e) => updateCustomWork(e.target.value)}
+                        disabled={running}
+                        className={inputClasses}
+                      />{" "}
+                      m
                     </label>
                     {!isSideQuest && (
                       <label className="text-sm font-semibold opacity-70">
                         Break
-                        <input type="number" min={0} max={60} value={customBreak}
-                          onChange={(e) => setCustomBreak(Math.max(0, parseInt(e.target.value) || 0))}
-                          disabled={running} className={inputClasses}/> m
+                        <input
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={customBreak}
+                          onChange={(e) => updateCustomBreak(e.target.value)}
+                          disabled={running}
+                          className={inputClasses}
+                        />{" "}
+                        m
                       </label>
                     )}
                   </div>
+                )}
+                {pendingMicroGoal && (
+                  <button
+                    type="button"
+                    onClick={() => applyMicroGoal(pendingMicroGoal)}
+                    className="mt-2 w-full border-0 rounded-lg bg-[#F59E0B] text-white text-sm font-bold px-3 py-2 cursor-pointer shadow-[0_4px_12px_rgba(245,158,11,0.28)]">
+                    Confirm new time: {pendingMicroGoal.label}
+                  </button>
                 )}
               </div>
 
               <div className="mt-auto pt-2 flex gap-1.5">
                 {phase === "idle" || phase === "done" ? (
-                  <button onClick={startQuest} disabled={!canStart}
-                    title={!activeQuest ? "Pick a quest first"
-                      : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
+                  <button
+                    onClick={startQuest}
+                    disabled={!canStart}
+                    title={
+                      !activeQuest
+                        ? "Pick a quest first"
+                        : contributingTabs.length === 0
+                          ? "Add at least 1 trail tab"
+                          : ""
+                    }
                     className={`flex-1 p-2.5 rounded-xl border-0 text-white font-bold text-base transition-all duration-200 ${canStart ? "cursor-pointer" : "cursor-not-allowed"}`}
                     style={{
                       background: canStart ? ringColor : "rgba(0,0,0,0.15)",
                       boxShadow: canStart ? `0 4px 14px ${ringColor}55` : "none"
                     }}>
-                    {!activeQuest ? "Pick a quest ↖"
-                      : contributingTabs.length === 0 ? "Add a trail tab ↖"
-                      : `▶ Start ${activeQuest.label}`}
+                    {!activeQuest
+                      ? "Pick a quest ↖"
+                      : contributingTabs.length === 0
+                        ? "Add a trail tab ↖"
+                        : `▶ Start ${activeQuest.label}`}
                   </button>
                 ) : (
                   <>
-                    {running
-                      ? <button onClick={pauseQuest}  className={`${controlBtnClasses} text-white`} style={{ background: "#1F2937" }}>⏸ Pause</button>
-                      : <button onClick={resumeQuest} className={`${controlBtnClasses} text-white`} style={{ background: ringColor }}>▶ Resume</button>}
-                    <button onClick={resetQuest} className={controlBtnClasses} style={{ background: "rgba(0,0,0,0.08)", color: "#1F2937" }}>↺</button>
+                    {running ? (
+                      <button
+                        onClick={pauseQuest}
+                        className={`${controlBtnClasses} text-white`}
+                        style={{ background: "#1F2937" }}>
+                        ⏸ Pause
+                      </button>
+                    ) : (
+                      <button
+                        onClick={resumeQuest}
+                        className={`${controlBtnClasses} text-white`}
+                        style={{ background: ringColor }}>
+                        ▶ Resume
+                      </button>
+                    )}
+                    <button
+                      onClick={resetQuest}
+                      className={controlBtnClasses}
+                      style={{
+                        background: "rgba(0,0,0,0.08)",
+                        color: "#1F2937"
+                      }}>
+                      ↺
+                    </button>
                   </>
                 )}
               </div>
@@ -1064,16 +1557,20 @@ function IndexPopup() {
 
             {showNudge && (
               <div className="card bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">
-                <div className="text-base font-bold mb-[3px]">👋 Hey, gentle check-in</div>
+                <div className="text-base font-bold mb-[3px]">
+                  👋 Hey, gentle check-in
+                </div>
                 <div className="text-sm opacity-80 mb-1.5">
                   Is this what you meant to be doing right now? No judgment.
                 </div>
                 <div className="flex gap-[5px]">
-                  <button onClick={() => setShowNudge(false)}
+                  <button
+                    onClick={() => setShowNudge(false)}
                     className="flex-1 p-[7px] rounded-lg border-0 bg-[#1F2937] text-white font-bold text-sm cursor-pointer">
                     ↩ Take me back to {activeProject}
                   </button>
-                  <button onClick={() => setShowNudge(false)}
+                  <button
+                    onClick={() => setShowNudge(false)}
                     className="px-[9px] py-[7px] rounded-lg border-0 bg-black/[0.08] text-sm cursor-pointer">
                     Not now
                   </button>
