@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import "./style.css" // tailwind entrypoint (must contain @tailwind base/components/utilities)
+import "./style.css" // tailwind entrypoint
 
 const STORAGE_KEY = "focusbuddy_timer"
 
@@ -16,13 +16,20 @@ const MICRO_GOALS = [
   { mins: 45, break: 15, label: "Deep Dive" }
 ]
 
-// Tailwind class strings used in place of the old inline style helpers
+const TIMEFRAMES = [
+  { id: "24h",   label: "24h"   },
+  { id: "week",  label: "Week"  },
+  { id: "month", label: "Month" },
+  { id: "year",  label: "Year"  }
+]
+
+// Tailwind helper class strings used in place of the old inline-style helpers
 const inputClasses =
   "w-[42px] ml-1 px-[5px] py-[3px] text-[11px] font-bold text-center border border-black/10 rounded-md bg-white/90 outline-none"
 const controlBtnClasses =
   "flex-1 p-2.5 rounded-xl border-0 font-bold text-[12px] cursor-pointer"
 
-// ---- Storage abstraction (works in extension OR plain dev) ----
+// ---- Storage abstraction ----
 const hasChrome = typeof chrome !== "undefined" && chrome?.storage?.local
 async function readStore() {
   if (hasChrome) {
@@ -61,7 +68,7 @@ function formatTime(secs) {
   return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 }
 
-// ---- Mock heatmap data (replace with /activity_logs query) ----
+// ---- Mock heatmap data (per cell: focus, dist, distractions, longestStreak) ----
 function generateMockHeatmap() {
   const grid = []
   for (let h = 0; h < 24; h++) {
@@ -74,12 +81,27 @@ function generateMockHeatmap() {
       else if (h >= 7 && h <= 8)    { focus = Math.random() * 120;       dist = Math.random() * 80 }
       else                           { focus = Math.random() * 30;        dist = Math.random() * 30 }
       if (Math.random() < 0.15) { focus *= 0.2; dist *= 1.4 }
-      row.push({ focus: Math.round(focus), dist: Math.round(dist) })
+
+      const offTrailHits  = Math.floor(dist / 35)
+      const idleBlips     = Math.random() < 0.4 ? Math.floor(Math.random() * 3) : 0
+      const distractions  = offTrailHits + idleBlips
+      // longest contiguous focus streak in MINUTES (uses focus magnitude as a proxy)
+      const longestStreak = focus > 80
+        ? Math.max(3, Math.floor((focus / 60) * 0.8 + Math.random() * 6))
+        : Math.floor(Math.random() * 3)
+
+      row.push({
+        focus: Math.round(focus),
+        dist: Math.round(dist),
+        distractions,
+        longestStreak
+      })
     }
     grid.push(row)
   }
   return grid
 }
+
 function heatColor(cell, maxTotal) {
   const total = cell.focus + cell.dist
   if (total < 4) return "rgba(0,0,0,0.04)"
@@ -140,44 +162,15 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
 }
 
 function HeatMap({ data }) {
+  const [selected, setSelected] = useState(null) // { h, b, focus, dist, distractions, longestStreak }
   const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
   const HOURS = 24, BUCKETS = 12
+
   return (
-    <div className="w-full">
-      {/* hour labels */}
-      <div
-        className="grid gap-[2px] mb-1"
-        style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
-        <div />
-        {Array.from({ length: HOURS }).map((_, h) => (
-          <div key={h}
-            className={`text-[9px] opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
-            {String(h).padStart(2, "0")}
-          </div>
-        ))}
-      </div>
-      {/* grid */}
-      {Array.from({ length: BUCKETS }).map((_, b) => (
-        <div key={b}
-          className="grid gap-[2px] mb-0.5"
-          style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
-          <div className="text-[9px] opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
-            {b % 2 === 0 ? `:${String(b * 5).padStart(2, "0")}` : ""}
-          </div>
-          {Array.from({ length: HOURS }).map((_, h) => {
-            const cell = data[h][b]
-            return (
-              <div key={h}
-                title={`${String(h).padStart(2,"0")}:${String(b*5).padStart(2,"0")} · focus ${cell.focus}s · activity ${cell.dist}`}
-                className="h-5 rounded-[3px] transition-colors duration-200"
-                style={{ background: heatColor(cell, maxTotal) }}
-              />
-            )
-          })}
-        </div>
-      ))}
-      {/* legend */}
-      <div className="flex items-center justify-between mt-3 text-[10px] opacity-75">
+    <div className="w-full flex flex-col">
+
+      {/* ===== Legend (TOP) ===== */}
+      <div className="flex items-center justify-center gap-4 mb-2 text-[10px] opacity-80">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm"/>
           <span>Deep focus</span>
@@ -191,6 +184,91 @@ function HeatMap({ data }) {
           <span>Quiet</span>
         </div>
       </div>
+
+      {/* ===== Plot area: Y-axis title + grid ===== */}
+      <div className="flex">
+        {/* Y-axis title — "HOURS" */}
+        <div
+          className="flex items-center justify-center pr-1 select-none"
+          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
+          <span className="text-[10px] font-bold opacity-70 tracking-[2px] uppercase">Hours</span>
+        </div>
+
+        <div className="flex-1">
+          {/* Grid rows */}
+          {Array.from({ length: BUCKETS }).map((_, b) => (
+            <div key={b}
+              className="grid gap-[2px] mb-0.5"
+              style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
+              {/* Y-axis numbers — increment by 3 up to 12 (rows 2,5,8,11 → 3,6,9,12) */}
+              <div className="text-[9px] opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
+                {((b + 1) % 3 === 0) ? `${b + 1}` : ""}
+              </div>
+              {Array.from({ length: HOURS }).map((_, h) => {
+                const cell = data[h][b]
+                const isSelected = selected?.h === h && selected?.b === b
+                return (
+                  <button key={h}
+                    type="button"
+                    onClick={() => setSelected({ h, b, ...cell })}
+                    title="Click for details"
+                    className={`h-5 rounded-[3px] border-0 cursor-pointer transition-all duration-150 hover:scale-[1.25] hover:z-10 hover:shadow-md ${isSelected ? "ring-2 ring-gray-800 ring-offset-1 scale-[1.15]" : ""}`}
+                    style={{ background: heatColor(cell, maxTotal) }}
+                  />
+                )
+              })}
+            </div>
+          ))}
+
+          {/* X-axis numbers (BOTTOM) — start at 1, +3: 1,4,7,10,13,16,19,22 */}
+          <div
+            className="grid gap-[2px] mt-1"
+            style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
+            <div />
+            {Array.from({ length: HOURS }).map((_, h) => (
+              <div key={h}
+                className={`text-[9px] opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
+                {h + 1}
+              </div>
+            ))}
+          </div>
+
+          {/* X-axis title */}
+          <div className="text-[10px] font-bold opacity-70 tracking-[2px] uppercase text-center mt-1">
+            Minutes
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Selected cell detail ===== */}
+      {selected && (
+        <div className="mt-2 px-3 py-2 rounded-lg bg-white/85 border border-black/10 flex items-center justify-between text-[11px] animate-[fadeIn_200ms_ease]">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-bold tabular-nums">
+              cell ({selected.h + 1}, {selected.b + 1})
+            </span>
+            <span className="opacity-75">
+              Distracted{" "}
+              <span className={`font-extrabold ${selected.distractions > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                {selected.distractions}
+              </span>{" "}
+              {selected.distractions === 1 ? "time" : "times"}
+            </span>
+            <span className="opacity-75">
+              Longest focus streak{" "}
+              <span className="font-extrabold text-blue-600">
+                {selected.longestStreak}m
+              </span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelected(null)}
+            className="text-[11px] opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -198,6 +276,7 @@ function HeatMap({ data }) {
 // =================================================================
 function IndexPopup() {
   const [view, setView] = useState("heatmap")
+  const [timeframe, setTimeframe] = useState("24h")
 
   const [activeQuest, setActiveQuest] = useState(null)
   const [goal, setGoal] = useState(MICRO_GOALS[1])
@@ -230,7 +309,7 @@ function IndexPopup() {
   const localWorkMins = isCustom ? customWork : goal.mins
   const localBreakMins = isSideQuest ? 0 : (isCustom ? customBreak : goal.break)
 
-  // ---- Initial load + subscribe to storage ----
+  // ---- Initial load + storage subscription ----
   useEffect(() => {
     let mounted = true
     const sync = async () => {
@@ -403,39 +482,62 @@ function IndexPopup() {
       : "🎉 nice work"
 
   return (
-    <div 
-      ref={containerRef}
-      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable',_system-ui,_sans-serif] text-[#1F2937] overflow-hidden flex flex-col transition-[background] duration-[1200ms] ease-in-out"
-      style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}
-    >
+    <div ref={containerRef}
+      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
+      style={{ background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)` }}>
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
         @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.6} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .quest-btn { border:none; padding:7px 12px; border-radius:999px; font-size:11px; font-weight:600; cursor:pointer; color:white;
+          transition: opacity 220ms ease, transform 120ms ease, box-shadow 120ms ease; }
+        .quest-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .card { background: rgba(255,255,255,0.82); backdrop-filter: blur(8px);
+          border-radius: 12px; padding: 10px 12px;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.06); animation: fadeIn 300ms ease; box-sizing: border-box; }
+        .tab-row { display:flex; align-items:center; gap:8px; padding:5px 7px; border-radius:8px; margin-bottom:3px;
+          font-size:11px; background: rgba(255,255,255,0.6); transition: background 200ms ease; }
+        .tab-contrib { background: linear-gradient(90deg, #DCFCE7, rgba(255,255,255,0.6)); border-left: 3px solid #34D399; }
+        .tab-side    { background: linear-gradient(90deg, #FEE2E2, rgba(255,255,255,0.6)); border-left: 3px solid #EF4444; opacity: 0.9; }
+        .scroll-y { overflow-y:auto; scrollbar-width: thin; }
+        .scroll-y::-webkit-scrollbar { width: 6px; }
+        .scroll-y::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+        .icon-btn { border:none; background: rgba(0,0,0,0.06); padding:5px 10px; border-radius:999px;
+          font-size:11px; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
+        .icon-btn:hover { background: rgba(0,0,0,0.12); }
+        .brand-lockup { display:flex; align-items:center; gap:9px; }
+        .brand-mark {
+          width:30px; height:30px; border-radius:9px;
+          display:flex; align-items:center; justify-content:center;
+          background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+          color:#92400E; font-size:17px;
+          box-shadow: 0 8px 18px rgba(245,158,11,0.22);
+        }
+        .brand-name {
+          font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+          font-size:22px; font-weight:700; line-height:1;
+          letter-spacing:0;
+          color:#111827;
+        }
+        .brand-subtitle {
+          margin-top:3px; font-size:10px; font-weight:650;
+          color:rgba(31,41,55,0.62); letter-spacing:0;
+        }
       `}</style>
 
       {sparkles.map((s) => <Sparkle key={s.id} x={s.x} y={s.y} />)}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-[10px] shrink-0">
-        <div className="flex items-center gap-[10px]">
+      <div className="flex items-center justify-between mb-2.5 shrink-0">
+        <div className="flex items-center gap-2.5">
           {view === "focus" && (
-            <button 
-              className="border-none bg-black/5 px-2.5 py-[5px] rounded-full text-[11px] font-bold cursor-pointer text-[#1F2937] transition-colors duration-150 hover:bg-black/10" 
-              onClick={() => setView("heatmap")}
-            >
-              ← Back
-            </button>
+            <button className="icon-btn" onClick={() => setView("heatmap")}>← Back</button>
           )}
-          <div className="flex items-center gap-[9px]">
-            <div className="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] text-[#92400E] text-[17px] shadow-[0_8px_18px_rgba(245,158,11,0.22)]">
-              💡
-            </div>
+          <div className="brand-lockup">
+            <div className="brand-mark">💡</div>
             <div>
-              <div className="font-['Playfair_Display',_serif] text-[22px] font-bold leading-none tracking-normal text-[#111827]">
-                FlowState
-              </div>
-              <div className="mt-[3px] text-[10px] font-[650] text-[#1F2937]/60 tracking-normal">
+              <div className="brand-name">FocusBuddy</div>
+              <div className="brand-subtitle">
                 {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
               </div>
             </div>
@@ -443,42 +545,51 @@ function IndexPopup() {
         </div>
         <div className="flex gap-2 items-center">
           {(phase === "work" || phase === "break") && view === "heatmap" && (
-            <button 
-              className="border-none bg-black/5 px-2.5 py-[5px] rounded-full text-[11px] font-bold cursor-pointer text-[#1F2937] transition-colors duration-150 hover:bg-black/10" 
-              onClick={() => setView("focus")}
-            >
-              ⏱ {timeLeft}
-            </button>
+            <button className="icon-btn" onClick={() => setView("focus")}>⏱ {timeLeft}</button>
           )}
-          <div 
-            title="People focusing right now"
-            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-[11px] font-semibold"
-          >
-            <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]" />
-            {bodyDouble}
+          <div title="Other FocusBuddy users in a focus session right now"
+            className="flex items-center gap-1.5 bg-white/70 px-2.5 py-[5px] rounded-full text-[11px] font-semibold">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#34D399] animate-[pulse_1.6s_infinite]"/>
+            {bodyDouble} others focusing now
           </div>
         </div>
       </div>
 
       {/* ============== HEATMAP (DEFAULT) ============== */}
       {view === "heatmap" && (
-        <div className="flex flex-col flex-1 min-h-0 gap-[10px]">
-          <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] box-border flex flex-1 flex-col min-h-0">
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-[11px] font-bold opacity-70 tracking-widest">
-                📊 ACTIVITY HEAT MAP · LAST 24H
+        <div className="flex flex-col flex-1 min-h-0 gap-2.5">
+          <div className="card flex-1 flex flex-col min-h-0">
+            <div className="flex justify-between items-center mb-2 gap-3">
+              <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
+                📊 ACTIVITY HEAT MAP
               </div>
-              <div className="text-[9px] opacity-[0.55]">Privacy-respecting · no URLs shown</div>
+
+              {/* Timeframe selector */}
+              <div className="flex items-center gap-1 bg-black/[0.05] rounded-full p-0.5">
+                {TIMEFRAMES.map((tf) => {
+                  const active = timeframe === tf.id
+                  return (
+                    <button
+                      key={tf.id}
+                      onClick={() => setTimeframe(tf.id)}
+                      className={`px-2.5 py-[3px] rounded-full text-[10px] font-bold transition-colors cursor-pointer ${active ? "bg-[#1F2937] text-white" : "text-[#1F2937]/70 hover:text-[#1F2937]"}`}>
+                      {tf.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="text-[9px] opacity-[0.55] whitespace-nowrap">Privacy-respecting · no URLs shown</div>
             </div>
-            <div className="flex-1 flex items-center justify-center min-h-0 py-1 px-[2px]">
+            <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
               <HeatMap data={heatData} />
             </div>
           </div>
 
-          <button 
-            onClick={() => setView("focus")}
-            className="p-3 border-none rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-120 active:scale-[0.98]"
-          >
+          <button onClick={() => setView("focus")}
+            className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-[13px] cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
+            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"}
+            onMouseUp={(e)   => e.currentTarget.style.transform = "scale(1)"}>
             {phase === "work" || phase === "break"
               ? `▶ Resume Focus Session · ${timeLeft}`
               : "✨ Start a Focus Session"}
@@ -488,85 +599,72 @@ function IndexPopup() {
 
       {/* ============== FOCUS / TIMER VIEW ============== */}
       {view === "focus" && (
-        <div className="grid grid-cols-2 gap-[10px] flex-1 min-h-0">
+        <div className="grid grid-cols-2 gap-2.5 flex-1 min-h-0">
           {/* LEFT */}
           <div className="flex flex-col gap-2 min-h-0">
-            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2 py-[10px] px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] shrink-0">
+            <div className="card shrink-0 !py-2 !px-3">
               <div className="text-[9px] font-bold opacity-[0.55] mb-1.5 tracking-[1.5px]">
                 STEP 1 · CHOOSE YOUR QUEST
               </div>
-              <div className="flex flex-wrap gap-1.25">
+              <div className="flex flex-wrap gap-[5px]">
                 {QUEST_TAGS.map((q) => {
                   const selected = activeQuest?.id === q.id
                   const dimmed = activeQuest && !selected
                   return (
-                    <button 
-                      key={q.id} 
+                    <button key={q.id}
                       onClick={(e) => pickQuest(q, e)}
-                      className="border-none py-1.75 px-3 rounded-full text-[11px] font-semibold cursor-pointer text-white transition-all duration-220 ease-in-out hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
-                      style={{ 
-                        background: q.color, 
-                        opacity: dimmed ? 0.35 : 1,
-                        outline: selected ? "3px solid rgba(0,0,0,0.15)" : "none"
-                      }}
-                    >
+                      className={`quest-btn ${dimmed ? "opacity-[0.35]" : "opacity-100"} ${selected ? "outline outline-[3px] outline-black/15" : "outline-none"}`}
+                      style={{ background: q.color }}>
                       {q.label}
                     </button>
                   )
                 })}
               </div>
               {isSideQuest && (
-                <div className="text-[9px] opacity-70 mt-1.25 italic">
+                <div className="text-[9px] opacity-70 mt-[5px] italic">
                   Side Quests are stimulation, not failure — running without a break.
                 </div>
               )}
             </div>
 
-            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] flex-1 flex flex-col min-h-0">
+            <div className="card flex-1 flex flex-col min-h-0">
               <div className="flex justify-between items-center">
-                <div className="text-[9px] font-bold opacity-[0.65] tracking-widest">
+                <div className="text-[9px] font-bold opacity-[0.65] tracking-[1px]">
                   STEP 2 · 🧭 ACTIVE GOAL MAP
                 </div>
-                <button 
-                  onClick={brainDump} 
-                  disabled={sideQuestTabs.length === 0}
-                  className={`border-none px-2 py-[3px] rounded-full text-[9px] font-bold ${sideQuestTabs.length ? 'bg-[#EF4444] cursor-pointer' : 'bg-black/10 cursor-not-allowed'} text-white`}
-                >
+                <button onClick={brainDump} disabled={sideQuestTabs.length === 0}
+                  className={`border-0 px-2 py-[3px] rounded-full text-white text-[9px] font-bold ${sideQuestTabs.length ? "bg-[#EF4444] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   🔥 Brain Dump ({sideQuestTabs.length})
                 </button>
               </div>
 
-              <div className="flex gap-1.25 my-1.5 shrink-0">
-                <input 
-                  value={newDomain}
+              <div className="flex gap-[5px] my-1.5 shrink-0">
+                <input value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTrailDomain()}
                   placeholder="Add a domain (e.g. react.dev)"
-                  className="flex-1 px-2.25 py-[5px] text-[11px] border border-black/10 rounded-lg bg-white/80 outline-none"
-                />
-                <button 
-                  onClick={addTrailDomain} 
-                  disabled={!newDomain.trim()}
-                  className={`border-none px-2.75 py-[5px] rounded-lg font-bold text-[11px] text-white ${newDomain.trim() ? 'bg-[#1F2937] cursor-pointer' : 'bg-black/10 cursor-not-allowed'}`}
-                >
+                  className="flex-1 px-[9px] py-[5px] text-[11px] border border-black/10 rounded-lg bg-white/80 outline-none"/>
+                <button onClick={addTrailDomain} disabled={!newDomain.trim()}
+                  className={`border-0 px-[11px] py-[5px] rounded-lg text-white text-[11px] font-bold ${newDomain.trim() ? "bg-[#1F2937] cursor-pointer" : "bg-black/10 cursor-not-allowed"}`}>
                   + Add
                 </button>
               </div>
 
-              <div className="overflow-y-auto scrollbar-thin flex-1 min-h-0 pr-1 [scrollbar-width:thin]">
-                <div className="text-[9px] font-bold text-[#059669] mb-[3px] tracking-tight">
+              <div className="scroll-y flex-1 min-h-0 pr-1">
+                <div className="text-[9px] font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
                   ✓ ON THE TRAIL · {formatTime(totalContributingSecs)} invested
                 </div>
                 {contributingTabs.length === 0 && (
-                  <div className="text-[10px] opacity-50 italic py-1 pb-1.5">
+                  <div className="text-[10px] opacity-50 italic pt-[3px] pb-1.5">
                     No quest tabs yet. Add one above to unlock the timer.
                   </div>
                 )}
                 {contributingTabs.map((t) => (
-                  <div key={t.id} className="flex items-center gap-2 p-1.25 px-1.75 rounded-lg mb-[3px] text-[11px] bg-white/60 transition-colors duration-200 bg-gradient-to-r from-[#DCFCE7] to-white/60 border-l-[3px] border-[#34D399]">
-                    <input type="checkbox" checked={t.contributing} onChange={() => toggleContributing(t.id)} className="cursor-pointer" />
+                  <div key={t.id} className="tab-row tab-contrib">
+                    <input type="checkbox" checked={t.contributing}
+                      onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                     <div className="flex-1 overflow-hidden">
-                      <div className="overflow-hidden text-ellipsis whitespace-nowrap font-semibold">{t.title}</div>
+                      <div className="truncate font-semibold">{t.title}</div>
                       <div className="text-[9px] opacity-60 flex gap-1.5">
                         <span>{t.url}</span><span>·</span>
                         <span>{t.visits} visits</span><span>·</span>
@@ -578,14 +676,15 @@ function IndexPopup() {
 
                 {sideQuestTabs.length > 0 && (
                   <>
-                    <div className="text-[9px] font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-tight">
+                    <div className="text-[9px] font-bold text-[#DC2626] mt-1.5 mb-[3px] tracking-[0.5px]">
                       🐇 SIDE QUESTS · stimulation, not failure
                     </div>
                     {sideQuestTabs.map((t) => (
-                      <div key={t.id} className="flex items-center gap-2 p-1.25 px-1.75 rounded-lg mb-[3px] text-[11px] bg-white/60 transition-colors duration-200 bg-gradient-to-r from-[#FEE2E2] to-white/60 border-l-[3px] border-[#EF4444] opacity-90">
-                        <input type="checkbox" checked={t.contributing} onChange={() => toggleContributing(t.id)} className="cursor-pointer" />
+                      <div key={t.id} className="tab-row tab-side">
+                        <input type="checkbox" checked={t.contributing}
+                          onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                         <div className="flex-1 overflow-hidden">
-                          <div className="overflow-hidden text-ellipsis whitespace-nowrap">{t.title}</div>
+                          <div className="truncate">{t.title}</div>
                           <div className="text-[9px] opacity-60 flex gap-1.5">
                             <span>{t.url}</span><span>·</span>
                             <span>{t.visits} visits</span><span>·</span>
@@ -608,7 +707,7 @@ function IndexPopup() {
 
           {/* RIGHT */}
           <div className="flex flex-col gap-2 min-h-0">
-            <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] flex-1 flex flex-col">
+            <div className="card flex-1 flex flex-col">
               <HeroRing
                 progress={progress}
                 color={ringColor}
@@ -625,47 +724,38 @@ function IndexPopup() {
                   {MICRO_GOALS.map((g) => {
                     const selected = !isCustom && goal.mins === g.mins
                     return (
-                      <button 
-                        key={g.mins}
+                      <button key={g.mins}
                         onClick={() => { setGoal(g); setIsCustom(false) }}
                         disabled={running}
-                        className={`border-none py-1.25 px-[2px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-[1px] ${running ? 'cursor-not-allowed' : 'cursor-pointer'} ${selected ? 'bg-[#1F2937] text-white' : 'bg-black/5 text-[#1F2937]'}`}
-                      >
+                        className={`border-0 px-0.5 py-[5px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-px ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
                         <span className="text-[11px]">{g.mins}m</span>
-                        {!isSideQuest && <span className="text-[8px] opacity-70 font-medium">+{g.break}m</span>}
+                        {!isSideQuest && (
+                          <span className="text-[8px] opacity-70 font-medium">+{g.break}m</span>
+                        )}
                       </button>
                     )
                   })}
-                  <button 
-                    onClick={() => setIsCustom(true)} 
-                    disabled={running}
-                    className={`border-none py-1.25 px-[2px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-[1px] ${running ? 'cursor-not-allowed' : 'cursor-pointer'} ${isCustom ? 'bg-[#1F2937] text-white' : 'bg-black/5 text-[#1F2937]'}`}
-                  >
+                  <button onClick={() => setIsCustom(true)} disabled={running}
+                    className={`border-0 px-0.5 py-[5px] rounded-lg text-[10px] font-bold flex flex-col items-center gap-px ${running ? "cursor-not-allowed" : "cursor-pointer"} ${isCustom ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
                     <span className="text-[11px]">⚙</span>
                     <span className="text-[8px] opacity-70 font-medium">custom</span>
                   </button>
                 </div>
 
                 {isCustom && (
-                  <div className="flex gap-2 mt-1.25 items-center justify-center">
+                  <div className="flex gap-2 mt-[5px] items-center justify-center">
                     <label className="text-[10px] font-semibold opacity-70">
                       Work
-                      <input 
-                        type="number" min={1} max={180} value={customWork}
+                      <input type="number" min={1} max={180} value={customWork}
                         onChange={(e) => setCustomWork(Math.max(1, parseInt(e.target.value) || 1))}
-                        disabled={running} 
-                        className="w-[42px] ml-1 py-[3px] px-[5px] text-[11px] font-bold border border-black/10 rounded-md bg-white/90 outline-none text-center"
-                      /> m
+                        disabled={running} className={inputClasses}/> m
                     </label>
                     {!isSideQuest && (
                       <label className="text-[10px] font-semibold opacity-70">
                         Break
-                        <input 
-                          type="number" min={0} max={60} value={customBreak}
+                        <input type="number" min={0} max={60} value={customBreak}
                           onChange={(e) => setCustomBreak(Math.max(0, parseInt(e.target.value) || 0))}
-                          disabled={running} 
-                          className="w-[42px] ml-1 py-[3px] px-[5px] text-[11px] font-bold border border-black/10 rounded-md bg-white/90 outline-none text-center"
-                        /> m
+                          disabled={running} className={inputClasses}/> m
                       </label>
                     )}
                   </div>
@@ -674,57 +764,42 @@ function IndexPopup() {
 
               <div className="mt-auto pt-2 flex gap-1.5">
                 {phase === "idle" || phase === "done" ? (
-                  <button 
-                    onClick={startQuest} 
-                    disabled={!canStart}
-                    title={!activeQuest ? "Pick a quest first" : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
-                    className={`flex-1 p-2.5 rounded-xl border-none text-white font-bold text-[12px] transition-all duration-200 ${canStart ? 'cursor-pointer shadow-lg' : 'cursor-not-allowed bg-black/15 shadow-none'}`}
-                    style={{ 
-                      backgroundColor: canStart ? ringColor : undefined,
-                      boxShadow: canStart ? `0 4px 14px ${ringColor}55` : undefined
-                    }}
-                  >
+                  <button onClick={startQuest} disabled={!canStart}
+                    title={!activeQuest ? "Pick a quest first"
+                      : contributingTabs.length === 0 ? "Add at least 1 trail tab" : ""}
+                    className={`flex-1 p-2.5 rounded-xl border-0 text-white font-bold text-[12px] transition-all duration-200 ${canStart ? "cursor-pointer" : "cursor-not-allowed"}`}
+                    style={{
+                      background: canStart ? ringColor : "rgba(0,0,0,0.15)",
+                      boxShadow: canStart ? `0 4px 14px ${ringColor}55` : "none"
+                    }}>
                     {!activeQuest ? "Pick a quest ↖"
                       : contributingTabs.length === 0 ? "Add a trail tab ↖"
                       : `▶ Start ${activeQuest.label}`}
                   </button>
                 ) : (
                   <>
-                    <button 
-                      onClick={running ? pauseQuest : resumeQuest} 
-                      className={`flex-1 p-2.5 rounded-xl border-none text-white font-bold text-[12px] cursor-pointer ${running ? 'bg-[#1F2937]' : ''}`}
-                      style={{ backgroundColor: !running ? ringColor : undefined }}
-                    >
-                      {running ? "⏸ Pause" : "▶ Resume"}
-                    </button>
-                    <button 
-                      onClick={resetQuest} 
-                      className="flex-1 p-2.5 rounded-xl border-none font-bold text-[12px] cursor-pointer bg-black/10 text-[#1F2937]"
-                    >
-                      ↺
-                    </button>
+                    {running
+                      ? <button onClick={pauseQuest}  className={`${controlBtnClasses} text-white`} style={{ background: "#1F2937" }}>⏸ Pause</button>
+                      : <button onClick={resumeQuest} className={`${controlBtnClasses} text-white`} style={{ background: ringColor }}>▶ Resume</button>}
+                    <button onClick={resetQuest} className={controlBtnClasses} style={{ background: "rgba(0,0,0,0.08)", color: "#1F2937" }}>↺</button>
                   </>
                 )}
               </div>
             </div>
 
             {showNudge && (
-              <div className="bg-white/80 backdrop-blur-md rounded-xl p-2.5 px-3 shadow-[0_4px_14px_rgba(0,0,0,0.06)] animate-[fadeIn_300ms_ease] bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">
+              <div className="card bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">
                 <div className="text-[11px] font-bold mb-[3px]">👋 Hey, gentle check-in</div>
                 <div className="text-[10px] opacity-80 mb-1.5">
                   Is this what you meant to be doing right now? No judgment.
                 </div>
-                <div className="flex gap-1.25">
-                  <button 
-                    onClick={() => setShowNudge(false)}
-                    className="flex-1 py-1.75 rounded-lg border-none bg-[#1F2937] text-white font-bold text-[10px] cursor-pointer"
-                  >
+                <div className="flex gap-[5px]">
+                  <button onClick={() => setShowNudge(false)}
+                    className="flex-1 p-[7px] rounded-lg border-0 bg-[#1F2937] text-white font-bold text-[10px] cursor-pointer">
                     ↩ Take me back to {activeProject}
                   </button>
-                  <button 
-                    onClick={() => setShowNudge(false)}
-                    className="py-1.75 px-2.25 rounded-lg border-none bg-black/10 text-[10px] cursor-pointer"
-                  >
+                  <button onClick={() => setShowNudge(false)}
+                    className="px-[9px] py-[7px] rounded-lg border-0 bg-black/[0.08] text-[10px] cursor-pointer">
                     Not now
                   </button>
                 </div>
