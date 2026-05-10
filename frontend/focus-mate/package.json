@@ -27,6 +27,12 @@
     "typescript": "5.3.3"
   },
   "manifest": {
+    "permissions": [
+      "alarms",
+      "tabs",
+      "idle",
+      "storage"
+    ],
     "host_permissions": [
       "https://*/*",
       "http://localhost:8000/*"

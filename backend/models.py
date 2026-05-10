@@ -1,14 +1,69 @@
 from __future__ import annotations
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import List
+from datetime import datetime
+
 from datetime import date, datetime
 from enum import Enum
 from typing import Any, Optional
 from urllib.parse import urlparse
 
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# Define Pydantic models for backend schema validation
+
+class User(BaseModel):
+    userId: str
+    name: str
+    email: str
+    createdAt: datetime
+
+class WindowMetrics(BaseModel):
+    activeSeconds: int
+    idleSeconds: int
+
+    tabChangeCount: int
+
+    clickCount: int
+    keystrokeCount: int
+    scrollDelta: int
+
+
+class TabActivity(BaseModel):
+    tabId: int
+    windowId: int
+
+    url: str
+    domain: str
+    title: str
+
+    category: str
+
+    isActive: bool
+
+    focusSeconds: int
+    idleSeconds: int
+
+    tabSwitchIn: int
+    tabSwitchOut: int
+
+    clickCount: int
+    keystrokeCount: int
+    scrollDelta: int
+
+
+class ActivityLog(BaseModel):
+    userId: str
+
+    timestamp: datetime
+
+    windowMetrics: WindowMetrics
+
+    tabs: List[TabActivity]
+
+    createdAt: datetime
 
 
 class UrlCategory(str, Enum):
