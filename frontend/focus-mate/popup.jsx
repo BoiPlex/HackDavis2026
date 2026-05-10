@@ -68,6 +68,12 @@ function formatTime(secs) {
   return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 }
 
+function formatCellTime(hourIndex, bucketIndex) {
+  const hour = String(hourIndex).padStart(2, "0")
+  const minute = String(bucketIndex * 5).padStart(2, "0")
+  return `${hour}:${minute}`
+}
+
 // ---- Mock heatmap data (per cell: focus, dist, distractions, longestStreak) ----
 function generateMockHeatmap() {
   const grid = []
@@ -245,7 +251,7 @@ function HeatMap({ data }) {
         <div className="mt-2 px-3 py-2 rounded-lg bg-white/85 border border-black/10 flex items-center justify-between text-base animate-[fadeIn_200ms_ease]">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-bold tabular-nums">
-              cell ({selected.h + 1}, {selected.b + 1})
+              {formatCellTime(selected.h, selected.b)}
             </span>
             <span className="opacity-75">
               Distracted{" "}
