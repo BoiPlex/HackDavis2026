@@ -16,12 +16,11 @@ from urllib.parse import urlparse
 
 class User(BaseModel):
     userId: str
-    name: str
-    email: str
+    settings: dict[str, Any] = {}
     createdAt: datetime
 
 class WindowMetrics(BaseModel):
-    activeSeconds: int
+    focusSeconds: int
     idleSeconds: int
 
     tabChangeCount: int

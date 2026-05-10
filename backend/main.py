@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from datetime import datetime, timezone
+
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db import db
 from models import *
@@ -55,6 +57,27 @@ async def get_user(userId: str):
     
     return {"user": user}
 
+@app.post("/users/{userId}")
+async def update_user(userId: str, user_data: dict = Body(default_factory=dict)):
+    # Strip server-managed fields so clients can't override them.
+    user_data.pop("userId", None)
+    user_data.pop("createdAt", None)
+
+    update: dict = {
+        "$setOnInsert": {
+            "userId": userId,
+            "createdAt": datetime.now(timezone.utc),
+        }
+    }
+    if user_data:
+        update["$set"] = user_data
+
+    await db.users.update_one({"userId": userId}, update, upsert=True)
+    user = await db.users.find_one({"userId": userId})
+    user = serialize_doc(user)
+
+    return {"user": user}
+
 # --- Activity logs ---
 
 @app.get("/activity")
@@ -78,9 +101,19 @@ async def get_activity_logs(userId: str):
     }
 
 @app.post("/activity/{userId}")
-async def post_activity_log(userId: str, activityLog: ActivityLog):
-    activityLog.userId = userId
-    await db.activity_logs.insert_one(activityLog.model_dump())
+async def post_activity_log(userId: str, snapshot: dict = Body(default_factory=dict)):
+    # Stamp server-side so clients can't spoof attribution.
+    snapshot["userId"] = userId
+    snapshot["createdAt"] = datetime.now(timezone.utc)
+
+    # Coerce client `timestamp` to a real datetime so Mongo stores ISODate.
+    ts = snapshot.get("timestamp")
+    if isinstance(ts, str):
+        snapshot["timestamp"] = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    elif isinstance(ts, (int, float)):
+        snapshot["timestamp"] = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+
+    await db.activity_logs.insert_one(snapshot)
 
     return {"message": "Successfully added activity log"}
 

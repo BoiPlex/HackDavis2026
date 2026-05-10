@@ -13,8 +13,12 @@ let tabId: number | null = null
 let clickCount = 0
 let keystrokeCount = 0
 let scrollDelta = 0
+let cursorDelta = 0
 let lastScrollY = 0
 let lastScrollX = 0
+let lastMouseX = 0
+let lastMouseY = 0
+let hasLastMouse = false
 let dirty = false
 let flushTimer: number | null = null
 
@@ -37,6 +41,7 @@ const flush = async () => {
         clickCount,
         keystrokeCount,
         scrollDelta,
+        cursorDelta,
         url: location.href,
         lastUpdate: Date.now()
       }
@@ -76,6 +81,18 @@ const onScroll = () => {
   scheduleFlush()
 }
 
+const onMouseMove = (e: MouseEvent) => {
+  const x = e.clientX
+  const y = e.clientY
+  if (hasLastMouse) {
+    cursorDelta += Math.hypot(x - lastMouseX, y - lastMouseY)
+  }
+  lastMouseX = x
+  lastMouseY = y
+  hasLastMouse = true
+  scheduleFlush()
+}
+
 const onPageHide = () => {
   if (flushTimer !== null) {
     clearTimeout(flushTimer)
@@ -87,6 +104,7 @@ const onPageHide = () => {
 window.addEventListener("click", onClick, { capture: true, passive: true })
 window.addEventListener("keydown", onKeydown, { capture: true, passive: true })
 window.addEventListener("scroll", onScroll, { capture: true, passive: true })
+window.addEventListener("mousemove", onMouseMove, { capture: true, passive: true })
 window.addEventListener("pagehide", onPageHide)
 
 lastScrollY = window.scrollY
