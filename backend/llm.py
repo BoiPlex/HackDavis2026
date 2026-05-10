@@ -13,6 +13,8 @@ async def ask_backboard(message: str, thread_id: str | None = None):
         message,
         thread_id=thread_id,
         memory="Auto",
+        llm_provider="google",
+        model_name="gemini-2.5-flash",
     )
 
     return {
@@ -20,3 +22,4 @@ async def ask_backboard(message: str, thread_id: str | None = None):
         "thread_id": response.thread_id,
         "assistant_id": response.assistant_id,
     }
+    
