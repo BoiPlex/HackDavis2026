@@ -54,19 +54,26 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
     if not logs:
         raise HTTPException(status_code=404, detail="No activity logs found for this user yet.")
 
+    user_data = await get_user(userId)
+
     usage_summary = summarize_activity_logs(logs)
 
     message = f"""
     You are a concise productivity coach for a browser activity tracker.
-    Answer the user's question using only the compact usage summary below.
+    Answer the user's question using only the compact usage summary below and user data below.
+    User data contains relevant information about productive and unproductive domains.
     Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, and scrolling when relevant.
     If the summary does not contain enough evidence, say what data is missing.
+    Naturally convert time into the smallest unit of time possible.
 
     User question:
     {question}
 
     Compact usage summary for user {userId}:
     {usage_summary}
+    
+    User data for user {userId}:
+    {user_data}
     """
 
     try:
