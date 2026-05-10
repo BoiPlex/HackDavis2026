@@ -1,6 +1,6 @@
 import "./style.css" // tailwind entrypoint
 
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 
 const STORAGE_KEY = "focusbuddy_timer"
 const THEME_KEY = "flowstate_theme"
@@ -126,6 +126,20 @@ function normalizeDomain(value) {
       .replace(/\/.*$/, "")
   }
 }
+// Matches a tab domain against a Set of root domains, treating subdomains
+// (and a leading www.) as matches: "m.youtube.com" matches allowed "youtube.com".
+function domainMatchesAllowed(tabDomain, allowedDomains) {
+  if (!allowedDomains || allowedDomains.size === 0) return false
+  const d = String(tabDomain || "")
+    .toLowerCase()
+    .replace(/^www\./, "")
+  if (!d) return false
+  if (allowedDomains.has(d)) return true
+  for (const allowed of allowedDomains) {
+    if (d.endsWith(`.${allowed}`)) return true
+  }
+  return false
+}
 function createTrailTab(domain, status = "stored") {
   return {
     id: `domain:${domain}`,
@@ -149,10 +163,16 @@ async function readUserId() {
 function emptyHeatmap() {
   return Array.from({ length: 24 }, () =>
     Array.from({ length: 12 }, () => ({
-      focus: 0,
-      dist: 0,
-      distractions: 0,
-      longestStreak: 0
+      // focus: 0,
+      // dist: 0,
+      // longestStreak: 0,
+      engagement: 0,
+      tabChangeCount: 0,
+      clickCount: 0,
+      keystrokeCount: 0,
+      scrollDelta: 0,
+      cursorDelta: 0,
+      tabs: []
     }))
   )
 }
@@ -172,12 +192,18 @@ function isValidGrid(g) {
   return (
     Array.isArray(g) &&
     g.length === 24 &&
-    g.every((row) => Array.isArray(row) && row.length === 12)
+    g.every((row) => Array.isArray(row) && row.length === 12) &&
+    Array.isArray(g[0]?.[0]?.tabs)
   )
 }
 
 function cloneGrid(grid) {
-  return grid.map((row) => row.map((cell) => ({ ...cell })))
+  return grid.map((row) =>
+    row.map((cell) => ({
+      ...cell,
+      tabs: Array.isArray(cell.tabs) ? cell.tabs.map((t) => ({ ...t })) : []
+    }))
+  )
 }
 
 // Backend may return ISO strings without an explicit offset (Mongo/Motor default
@@ -212,7 +238,41 @@ function mergeLogsIntoGrid(grid, logs) {
     }
     next[h][b].focus += focus
     next[h][b].dist += dist
-    next[h][b].distractions += log.windowMetrics?.tabChangeCount || 0
+    next[h][b].tabChangeCount += log.windowMetrics?.tabChangeCount || 0
+    next[h][b].clickCount += log.windowMetrics?.clickCount || 0
+    next[h][b].keystrokeCount += log.windowMetrics?.keystrokeCount || 0
+    next[h][b].scrollDelta += log.windowMetrics?.scrollDelta || 0
+    next[h][b].cursorDelta += log.windowMetrics?.cursorDelta || 0
+
+    if (!Array.isArray(next[h][b].tabs)) next[h][b].tabs = []
+    for (const tab of log.tabs || []) {
+      const domain = (tab.domain || "").trim()
+      if (!domain) continue
+      let entry = next[h][b].tabs.find((t) => t.domain === domain)
+      if (!entry) {
+        entry = {
+          domain,
+          focusSeconds: 0,
+          idleSeconds: 0,
+          tabSwitchIn: 0,
+          tabSwitchOut: 0,
+          clickCount: 0,
+          keystrokeCount: 0,
+          scrollDelta: 0,
+          cursorDelta: 0
+        }
+        next[h][b].tabs.push(entry)
+      }
+      entry.focusSeconds += tab.focusSeconds || 0
+      entry.idleSeconds += tab.idleSeconds || 0
+      entry.tabSwitchIn += tab.tabSwitchIn || 0
+      entry.tabSwitchOut += tab.tabSwitchOut || 0
+      entry.clickCount += tab.clickCount || 0
+      entry.keystrokeCount += tab.keystrokeCount || 0
+      entry.scrollDelta += tab.scrollDelta || 0
+      entry.cursorDelta += tab.cursorDelta || 0
+    }
+
     todays.push({ minute, h, b, focus, dist })
   }
 
@@ -241,6 +301,19 @@ function mergeLogsIntoGrid(grid, logs) {
     }
   }
   flush()
+
+  // Stamp each cell's engagement = avg(metric / metricMax) * 100
+  const maxes = computeMetricMaxes(next)
+  for (const row of next) {
+    for (const cell of row) {
+      let sum = 0
+      for (const k of ALL_METRIC_KEYS) {
+        sum += ((cell[k] || 0) / maxes[k]) * 100
+      }
+      cell.engagement = sum / ALL_METRIC_KEYS.length
+    }
+  }
+
   return next
 }
 
@@ -270,9 +343,24 @@ function formatTime(secs) {
 }
 
 function formatCellTime(hourIndex, bucketIndex) {
-  const hour = String(hourIndex).padStart(2, "0")
   const minute = String(bucketIndex * 5).padStart(2, "0")
-  return `${hour}:${minute}`
+  const period = hourIndex < 12 ? "AM" : "PM"
+  const hour12 = hourIndex % 12 === 0 ? 12 : hourIndex % 12
+  return `${hour12}:${minute} ${period}`
+}
+
+// Render plain text with **bold** segments wrapped in <strong>. Lazy non-greedy
+// match keeps adjacent bold spans from merging; non-bold runs stay as plain
+// text inside Fragments so whitespace-pre-wrap continues to work.
+function renderInlineBold(text) {
+  if (text == null || text === "") return null
+  const parts = String(text).split(/(\*\*[^*]+?\*\*)/g)
+  return parts.map((part, i) => {
+    if (/^\*\*[^*]+?\*\*$/.test(part)) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    return <Fragment key={i}>{part}</Fragment>
+  })
 }
 
 // ---- Mock heatmap data (per cell: focus, dist, distractions, longestStreak) ----
@@ -325,17 +413,43 @@ function generateMockHeatmap() {
   return grid
 }
 
-function heatColor(cell, maxTotal, isDark = false) {
-  const total = cell.focus + cell.dist
-  if (total < 4) return isDark ? "rgba(148,163,184,0.18)" : "rgba(0,0,0,0.04)"
-  const ratio = cell.focus / total
-  const focusColor = isDark ? { r: 96, g: 165, b: 250 } : { r: 59, g: 130, b: 246 }
-  const distColor = isDark ? { r: 251, g: 191, b: 36 } : { r: 245, g: 158, b: 11 }
-  const r = Math.round(focusColor.r * ratio + distColor.r * (1 - ratio))
-  const g = Math.round(focusColor.g * ratio + distColor.g * (1 - ratio))
-  const b = Math.round(focusColor.b * ratio + distColor.b * (1 - ratio))
-  const a = (isDark ? 0.32 : 0.18) + Math.min(1, total / maxTotal) * (isDark ? 0.68 : 0.82)
-  return `rgba(${r}, ${g}, ${b}, ${a})`
+function heatColor(value, maxTotal, rgb) {
+  if (!value || value <= 0 || maxTotal <= 0) return "rgba(0,0,0,0.04)"
+  const ratio = Math.min(1, value / maxTotal)
+  const a = 0.15 + ratio * 0.85
+  return `rgba(${rgb}, ${a})`
+}
+
+const HEATMAP_METRICS = [
+  { id: "all", label: "All", color: "#3B82F6", rgb: "59, 130, 246" },
+  { id: "tabChangeCount", label: "Tab changes", color: "#F59E0B", rgb: "245, 158, 11" },
+  { id: "clickCount", label: "Clicks", color: "#8B5CF6", rgb: "139, 92, 246" },
+  { id: "keystrokeCount", label: "Keystrokes", color: "#EC4899", rgb: "236, 72, 153" },
+  { id: "scrollDelta", label: "Scroll", color: "#14B8A6", rgb: "20, 184, 166" },
+  { id: "cursorDelta", label: "Cursor", color: "#6366F1", rgb: "99, 102, 241" }
+]
+
+const ALL_METRIC_KEYS = [
+  "tabChangeCount",
+  "clickCount",
+  "keystrokeCount",
+  "scrollDelta",
+  "cursorDelta"
+]
+
+function computeMetricMaxes(grid) {
+  const flat = grid.flat()
+  const maxes = {}
+  for (const k of ALL_METRIC_KEYS) {
+    maxes[k] = Math.max(1, ...flat.map((c) => c?.[k] || 0))
+  }
+  return maxes
+}
+
+function cellMetricValue(cell, metric) {
+  if (!cell) return 0
+  if (metric === "all") return cell.engagement || 0
+  return cell[metric] || 0
 }
 
 // ---- Components ----
@@ -407,38 +521,158 @@ function HeroRing({
   )
 }
 
-function HeatMap({ data, isDark = false }) {
-  const [selected, setSelected] = useState(null) // { h, b, focus, dist, distractions, longestStreak }
-  const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
+function HeatMap({
+  data,
+  isDark = false,
+  productiveDomains = [],
+  distractionDomains = []
+}) {
+  const [selected, setSelected] = useState(null)
+  const [metric, setMetric] = useState("all")
+  const [scope, setScope] = useState("all")
+  const activeMetric =
+    HEATMAP_METRICS.find((m) => m.id === metric) || HEATMAP_METRICS[0]
+  const productiveSet = new Set(productiveDomains)
+  const distractionSet = new Set(distractionDomains)
+  const allowedDomains =
+    scope === "productive"
+      ? productiveSet
+      : scope === "distractions"
+        ? distractionSet
+        : null
+  const filterActive = !!allowedDomains && allowedDomains.size > 0
+
+  let viewData = data
+  if (filterActive) {
+    viewData = data.map((row) =>
+      row.map((cell) => {
+        const matching = (cell.tabs || []).filter((t) =>
+          domainMatchesAllowed(t.domain, allowedDomains)
+        )
+        let clickCount = 0,
+          keystrokeCount = 0,
+          scrollDelta = 0,
+          cursorDelta = 0
+        for (const t of matching) {
+          clickCount += t.clickCount || 0
+          keystrokeCount += t.keystrokeCount || 0
+          scrollDelta += t.scrollDelta || 0
+          cursorDelta += t.cursorDelta || 0
+        }
+        return {
+          ...cell,
+          tabChangeCount: 0,
+          clickCount,
+          keystrokeCount,
+          scrollDelta,
+          cursorDelta,
+          tabs: matching
+        }
+      })
+    )
+    const maxes = computeMetricMaxes(viewData)
+    viewData = viewData.map((row) =>
+      row.map((cell) => {
+        let sum = 0
+        for (const k of ALL_METRIC_KEYS) {
+          sum += ((cell[k] || 0) / maxes[k]) * 100
+        }
+        return { ...cell, engagement: sum / ALL_METRIC_KEYS.length }
+      })
+    )
+  }
+
+  const maxTotal = Math.max(
+    1,
+    ...viewData.flat().map((c) => cellMetricValue(c, metric))
+  )
+  const selectedCell = selected ? viewData[selected.h][selected.b] : null
   const HOURS = 24,
     BUCKETS = 12
 
   return (
     <div className="w-full flex flex-col">
-      {/* ===== Legend (TOP) ===== */}
-      <div className="flex items-center justify-center gap-4 mb-2 text-sm opacity-80">
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-[rgba(59,130,246,0.85)] rounded-sm" />
-          <span>Deep focus</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-[rgba(245,158,11,0.85)] rounded-sm" />
-          <span>Tab-switching / scrolling</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-2.5 bg-black/[0.06] rounded-sm" />
-          <span>Quiet</span>
-        </div>
+      {/* ===== Metric filter ===== */}
+      <div className="flex items-center justify-center gap-1 mb-1 flex-wrap">
+        {HEATMAP_METRICS.map((m) => {
+          const active = metric === m.id
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setMetric(m.id)}
+              style={active ? { background: m.color, color: "#fff" } : undefined}
+              className={`px-2.5 py-[3px] rounded-full text-xs font-bold cursor-pointer border-0 transition-colors ${active ? "" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1]"}`}>
+              {m.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ===== Tab scope toggle ===== */}
+      <div className="flex items-center justify-center gap-1 mb-2 mt-1">
+        <button
+          type="button"
+          onClick={() => setScope("all")}
+          className={`px-2.5 py-[2px] rounded-full text-[10px] font-bold cursor-pointer border-0 transition-colors ${scope === "all" ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1]"}`}>
+          All tabs
+        </button>
+        <button
+          type="button"
+          onClick={() => setScope("productive")}
+          disabled={productiveSet.size === 0}
+          title={
+            productiveSet.size === 0
+              ? "Mark some tabs as productive first"
+              : ""
+          }
+          style={
+            scope === "productive" && productiveSet.size > 0
+              ? { background: "#059669", color: "#fff" }
+              : undefined
+          }
+          className={`px-2.5 py-[2px] rounded-full text-[10px] font-bold border-0 transition-colors ${productiveSet.size === 0 ? "cursor-not-allowed opacity-40 bg-black/[0.06] text-[#1F2937]" : scope === "productive" ? "cursor-pointer" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1] cursor-pointer"}`}>
+          Productive ({productiveSet.size})
+        </button>
+        <button
+          type="button"
+          onClick={() => setScope("distractions")}
+          disabled={distractionSet.size === 0}
+          title={
+            distractionSet.size === 0
+              ? "Mark some tabs as distraction first"
+              : ""
+          }
+          style={
+            scope === "distractions" && distractionSet.size > 0
+              ? { background: "#DC2626", color: "#fff" }
+              : undefined
+          }
+          className={`px-2.5 py-[2px] rounded-full text-[10px] font-bold border-0 transition-colors ${distractionSet.size === 0 ? "cursor-not-allowed opacity-40 bg-black/[0.06] text-[#1F2937]" : scope === "distractions" ? "cursor-pointer" : "bg-black/[0.06] text-[#1F2937] hover:bg-black/[0.1] cursor-pointer"}`}>
+          Distractions ({distractionSet.size})
+        </button>
+      </div>
+
+      {/* ===== Intensity scale ===== */}
+      <div className="flex items-center justify-center gap-2 mb-2 text-sm opacity-80">
+        <span className="text-xs opacity-60">Low</span>
+        <div
+          className="w-28 h-2.5 rounded-sm"
+          style={{
+            background: `linear-gradient(90deg, rgba(${activeMetric.rgb}, 0.15), rgba(${activeMetric.rgb}, 1))`
+          }}
+        />
+        <span className="text-xs opacity-60">High</span>
       </div>
 
       {/* ===== Plot area: Y-axis title + grid ===== */}
       <div className="flex">
-        {/* Y-axis title — "HOURS" */}
+        {/* Y-axis title — "MINUTES" */}
         <div
           className="flex items-center justify-center pr-1 select-none"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
           <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">
-            Hours
+            Minutes
           </span>
         </div>
 
@@ -451,19 +685,25 @@ function HeatMap({ data, isDark = false }) {
               style={{ gridTemplateColumns: `28px repeat(${HOURS}, 1fr)` }}>
               {/* Y-axis numbers — increment by 3 up to 12 (rows 2,5,8,11 → 3,6,9,12) */}
               <div className="text-sm opacity-60 text-right pr-1 flex items-center justify-end font-semibold">
-                {(b + 1) % 3 === 0 ? `${b + 1}` : ""}
+                {((b + 1) * 5) % 15 === 0 ? `${(b + 1) * 5}` : ""}
               </div>
               {Array.from({ length: HOURS }).map((_, h) => {
-                const cell = data[h][b]
+                const cell = viewData[h][b]
                 const isSelected = selected?.h === h && selected?.b === b
                 return (
                   <button
                     key={h}
                     type="button"
-                    onClick={() => setSelected({ h, b, ...cell })}
+                    onClick={() => setSelected({ h, b })}
                     title="Click for details"
                     className={`h-5 rounded-[3px] border-0 cursor-pointer transition-all duration-150 hover:scale-[1.25] hover:z-10 hover:shadow-md ${isSelected ? "ring-2 ring-gray-800 ring-offset-1 scale-[1.15]" : ""}`}
-                    style={{ background: heatColor(cell, maxTotal, isDark) }}
+                    style={{
+                      background: heatColor(
+                        cellMetricValue(cell, metric),
+                        maxTotal,
+                        activeMetric.rgb
+                      )
+                    }}
                   />
                 )
               })}
@@ -478,7 +718,7 @@ function HeatMap({ data, isDark = false }) {
             {Array.from({ length: HOURS }).map((_, h) => (
               <div
                 key={h}
-                className={`text-sm opacity-60 text-center font-semibold ${h % 3 === 0 ? "visible" : "invisible"}`}>
+                className={`text-sm opacity-60 text-center font-semibold ${(h + 1) % 3 === 0 ? "visible" : "invisible"}`}>
                 {h + 1}
               </div>
             ))}
@@ -486,40 +726,121 @@ function HeatMap({ data, isDark = false }) {
 
           {/* X-axis title */}
           <div className="text-sm font-bold opacity-70 tracking-[2px] uppercase text-center mt-1">
-            Minutes
+            Hours
           </div>
         </div>
       </div>
 
-      {/* ===== Selected cell detail ===== */}
-      {selected && (
-        <div className="heatmap-detail mt-2 px-3 py-2 rounded-lg flex items-center justify-between text-base animate-[fadeIn_200ms_ease]">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-bold tabular-nums">
-              {formatCellTime(selected.h, selected.b)}
-            </span>
-            <span className="opacity-75">
-              Distracted{" "}
-              <span
-                className={`font-extrabold ${selected.distractions > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                {selected.distractions}
-              </span>{" "}
-              {selected.distractions === 1 ? "time" : "times"}
-            </span>
-            <span className="opacity-75">
-              Longest focus streak{" "}
-              <span className="font-extrabold text-blue-600">
-                {selected.longestStreak}m
-              </span>
-            </span>
-          </div>
-          <button
-            type="button"
+      {/* ===== Selected cell detail (modal popup) ===== */}
+      {selected && selectedCell && (
+        <>
+          <div
+            className="heatmap-detail fixed inset-0 bg-black/40 z-40 animate-[fadeIn_150ms_ease]"
             onClick={() => setSelected(null)}
-            className="heatmap-detail-close text-base opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
-            ✕
-          </button>
-        </div>
+          />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+          <div
+            role="dialog"
+            className="px-5 py-5 rounded-2xl bg-white border border-black/10 shadow-2xl animate-[fadeIn_180ms_ease] min-w-[420px] max-w-[560px]"
+            style={{ background: "rgba(255,255,255,0.98)" }}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-baseline gap-2">
+                <span className="font-extrabold text-xl tabular-nums">
+                  {formatCellTime(selected.h, selected.b)}
+                </span>
+                {filterActive && (
+                  <span
+                    className="text-xs font-bold uppercase tracking-[1px]"
+                    style={{
+                      color: scope === "productive" ? "#059669" : "#DC2626"
+                    }}>
+                    · {scope}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Close"
+                className="text-lg opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent shrink-0">
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-base">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Engagement</span>
+                <span className="font-extrabold text-[#3B82F6] tabular-nums">
+                  {Math.round(selectedCell.engagement || 0)}%
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Tab changes</span>
+                <span className="font-extrabold text-[#F59E0B] tabular-nums">
+                  {selectedCell.tabChangeCount || 0}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Clicks</span>
+                <span className="font-extrabold text-[#8B5CF6] tabular-nums">
+                  {selectedCell.clickCount || 0}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Keystrokes</span>
+                <span className="font-extrabold text-[#EC4899] tabular-nums">
+                  {selectedCell.keystrokeCount || 0}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Scroll</span>
+                <span className="font-extrabold text-[#14B8A6] tabular-nums">
+                  {Math.round(selectedCell.scrollDelta || 0)}px
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="opacity-75">Cursor</span>
+                <span className="font-extrabold text-[#6366F1] tabular-nums">
+                  {Math.round(selectedCell.cursorDelta || 0)}px
+                </span>
+              </div>
+            </div>
+            {(() => {
+              const cellTabs = Array.isArray(selectedCell.tabs)
+                ? [...selectedCell.tabs].sort(
+                    (a, b) => (b.focusSeconds || 0) - (a.focusSeconds || 0)
+                  )
+                : []
+              return (
+                <div className="mt-3 pt-3 border-t border-black/10">
+                  <div className="text-xs font-bold opacity-60 tracking-[1px] uppercase mb-1.5">
+                    Active tabs ({cellTabs.length})
+                  </div>
+                  {cellTabs.length === 0 ? (
+                    <div className="text-sm opacity-50 italic">
+                      No active tabs in this window.
+                    </div>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-1">
+                      {cellTabs.map((t) => (
+                        <div
+                          key={t.domain}
+                          className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="truncate font-semibold">
+                            {t.domain}
+                          </span>
+                          <span className="opacity-70 tabular-nums shrink-0">
+                            {formatTime(Math.round(t.focusSeconds || 0))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+          </div>
+        </>
       )}
     </div>
   )
@@ -1257,7 +1578,7 @@ function IndexPopup() {
     <div
       ref={containerRef}
       data-theme={theme}
-      className="relative w-[760px] h-[580px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] text-base overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
+      className="relative w-[760px] h-[600px] p-[14px] font-['Segoe_UI_Variable','Segoe_UI',system-ui,sans-serif] text-[#1F2937] text-base overflow-hidden box-border flex flex-col transition-[background] duration-[1200ms]"
       style={{ background: appBackground }}>
       <style>{`
         @keyframes sparklePop { 0%{transform:scale(.4) translateY(0);opacity:1} 100%{transform:scale(1.6) translateY(-30px);opacity:0} }
@@ -1464,7 +1785,18 @@ function IndexPopup() {
               </div>
             </div>
             <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
-              <HeatMap data={heatData} isDark={isDark} />
+              <HeatMap
+                data={heatData}
+                isDark={isDark}
+                productiveDomains={tabs
+                  .filter((t) => t.contributing === true)
+                  .map((t) => normalizeDomain(t.url || ""))
+                  .filter(Boolean)}
+                distractionDomains={tabs
+                  .filter((t) => t.contributing === false)
+                  .map((t) => normalizeDomain(t.url || ""))
+                  .filter(Boolean)}
+              />
             </div>
           </div>
 
@@ -1493,7 +1825,7 @@ function IndexPopup() {
                     "Summarize my focus patterns and give me one recommendation."
                   )
                 }
-                className="icon-btn">
+                className="icon-btn text-[11px]">
                 Suggest
               </button>
             </div>
@@ -1535,8 +1867,10 @@ function IndexPopup() {
                 <span className="opacity-60">
                   Reading your recent activity...
                 </span>
-              ) : aiError || aiAnswer ? (
-                aiError || aiAnswer
+              ) : aiError ? (
+                aiError
+              ) : aiAnswer ? (
+                renderInlineBold(aiAnswer)
               ) : (
                 <span className="opacity-55">
                   Ask a question to see personalized usage insight here.

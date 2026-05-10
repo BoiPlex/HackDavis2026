@@ -66,25 +66,48 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
         raise HTTPException(status_code=404, detail="No activity logs found for this user yet.")
 
     user_data = await get_user(userId)
+    user = user_data.get("user", {})
+    settings = user.get("settings", {})
+    
     usage_summary = summarize_activity_logs(logs)
 
     message = f"""
     You are a concise productivity coach for a browser activity tracker.
-    Answer the user's question using only the compact usage summary below and user data below.
-    User data contains relevant information about the current quest (Research, Work, etc), goal, productive (contributing) and unproductive domains in tabs, 24 hour heatmap, and the current pomodoro timer state.
-    Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, and scrolling when relevant.
-    If the summary does not contain enough evidence, say what data is missing.
+    Answer the user's question using only the data provided below as well as tailored time management advice.
+    Be supportive and helpful. The user struggles with focusing and distractions. Provide tailored thoughtful advice.
+    Given:
+    - 24 hour usage summary
+    - Heatmap goes by 24 hours and 5 minute buckets, and shows a variety of useful metrics.
+    - Current quest, one of Research, Work, or Distractions.
+    - user-specified productive (contributing) and unproductive domains in tabs, heatmap, 
+    - Goal and timer represent the user's Pomodoro timer goal and state.
+    Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, scrolling, cursor movement, and overall engagement when relevant.
+    If the summary or any provided data does not contain enough evidence, say what data is missing.
     Naturally convert time into the smallest unit of time possible.
+    Write response in plaintext, styling is not possible.
 
     User question:
     {question}
 
-    Compact usage summary for user {userId}:
+    Compact usage summary:
     {usage_summary}
+    
+    Heatmap:
+    {user.get("heatmap")}
+    
+    Current quest:
+    {settings.get("quest")}
+    
+    User-specified tabs:
+    {settings.get("tabs")}
 
-    User data for user {userId}:
-    {user_data}
+    Goal:
+    {settings.get("goal")}
+    
+    Timer:
+    {user.get("timer")}
     """
+    print(f"user {userId} message: {message}")
 
     try:
         response = await ask_backboard(message)

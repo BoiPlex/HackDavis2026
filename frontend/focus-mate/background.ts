@@ -226,12 +226,24 @@ const accountElapsed = () => {
   }
 }
 
+const tabHadActivity = (t: TabMetric): boolean =>
+  t.focusSeconds > 0 ||
+  t.idleSeconds > 0 ||
+  t.tabSwitchIn > 0 ||
+  t.tabSwitchOut > 0 ||
+  t.clickCount > 0 ||
+  t.keystrokeCount > 0 ||
+  t.scrollDelta > 0 ||
+  t.cursorDelta > 0
+
 const snapshot = (): Snapshot => ({
   id: crypto.randomUUID(),
   userId,
   timestamp: new Date().toISOString(),
   windowMetrics: { ...windowMetrics },
-  tabs: Array.from(tabs.values()).map((t) => ({ ...t }))
+  tabs: Array.from(tabs.values())
+    .filter(tabHadActivity)
+    .map((t) => ({ ...t }))
 })
 
 // Diff `cur` against the last-seen cumulative counters for `tabId` and
