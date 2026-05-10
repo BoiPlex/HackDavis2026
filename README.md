@@ -35,6 +35,7 @@ HackDavis2026/
 │   └── focus-mate/
 ├── backend/
 └── README.md
+```
 
 ## Getting Started
 
