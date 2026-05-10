@@ -1,8 +1,4 @@
-import "./style.css"
-
 import { useState, useEffect, useRef } from "react"
-
-const API_BASE = "http://localhost:8000"
 
 const STORAGE_KEY = "focusbuddy_timer"
 
