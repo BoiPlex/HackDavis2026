@@ -325,14 +325,16 @@ function generateMockHeatmap() {
   return grid
 }
 
-function heatColor(cell, maxTotal) {
+function heatColor(cell, maxTotal, isDark = false) {
   const total = cell.focus + cell.dist
-  if (total < 4) return "rgba(0,0,0,0.04)"
+  if (total < 4) return isDark ? "rgba(148,163,184,0.18)" : "rgba(0,0,0,0.04)"
   const ratio = cell.focus / total
-  const r = Math.round(59 * ratio + 245 * (1 - ratio))
-  const g = Math.round(130 * ratio + 158 * (1 - ratio))
-  const b = Math.round(246 * ratio + 11 * (1 - ratio))
-  const a = 0.18 + Math.min(1, total / maxTotal) * 0.82
+  const focusColor = isDark ? { r: 96, g: 165, b: 250 } : { r: 59, g: 130, b: 246 }
+  const distColor = isDark ? { r: 251, g: 191, b: 36 } : { r: 245, g: 158, b: 11 }
+  const r = Math.round(focusColor.r * ratio + distColor.r * (1 - ratio))
+  const g = Math.round(focusColor.g * ratio + distColor.g * (1 - ratio))
+  const b = Math.round(focusColor.b * ratio + distColor.b * (1 - ratio))
+  const a = (isDark ? 0.32 : 0.18) + Math.min(1, total / maxTotal) * (isDark ? 0.68 : 0.82)
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
 
@@ -405,7 +407,7 @@ function HeroRing({
   )
 }
 
-function HeatMap({ data }) {
+function HeatMap({ data, isDark = false }) {
   const [selected, setSelected] = useState(null) // { h, b, focus, dist, distractions, longestStreak }
   const maxTotal = Math.max(1, ...data.flat().map((c) => c.focus + c.dist))
   const HOURS = 24,
@@ -461,7 +463,7 @@ function HeatMap({ data }) {
                     onClick={() => setSelected({ h, b, ...cell })}
                     title="Click for details"
                     className={`h-5 rounded-[3px] border-0 cursor-pointer transition-all duration-150 hover:scale-[1.25] hover:z-10 hover:shadow-md ${isSelected ? "ring-2 ring-gray-800 ring-offset-1 scale-[1.15]" : ""}`}
-                    style={{ background: heatColor(cell, maxTotal) }}
+                    style={{ background: heatColor(cell, maxTotal, isDark) }}
                   />
                 )
               })}
@@ -491,7 +493,7 @@ function HeatMap({ data }) {
 
       {/* ===== Selected cell detail ===== */}
       {selected && (
-        <div className="mt-2 px-3 py-2 rounded-lg bg-white/85 border border-black/10 flex items-center justify-between text-base animate-[fadeIn_200ms_ease]">
+        <div className="heatmap-detail mt-2 px-3 py-2 rounded-lg flex items-center justify-between text-base animate-[fadeIn_200ms_ease]">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-bold tabular-nums">
               {formatCellTime(selected.h, selected.b)}
@@ -514,7 +516,7 @@ function HeatMap({ data }) {
           <button
             type="button"
             onClick={() => setSelected(null)}
-            className="text-base opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
+            className="heatmap-detail-close text-base opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent">
             ✕
           </button>
         </div>
@@ -1307,6 +1309,27 @@ function IndexPopup() {
         }
         .theme-toggle:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(31,41,55,0.12); }
         .theme-pill { color:#1F2937; }
+        .heatmap-detail {
+          background: rgba(255,255,255,0.85);
+          border: 1px solid rgba(0,0,0,0.1);
+          color:#1F2937;
+        }
+        .heatmap-detail-close { color:#1F2937; }
+        .ai-input {
+          background: rgba(255,255,255,0.85);
+          color:#1F2937;
+          border-color: rgba(0,0,0,0.1);
+        }
+        .ai-output {
+          background: rgba(255,255,255,0.85);
+          color:#1F2937;
+          border-color: rgba(0,0,0,0.1);
+        }
+        .ai-output-error {
+          background:#FEF2F2;
+          color:#B91C1C;
+          border-color:#FECACA;
+        }
         [data-theme="dark"] { color:#E5E7EB; }
         [data-theme="dark"] .card {
           background: rgba(15,23,42,0.78);
@@ -1329,10 +1352,34 @@ function IndexPopup() {
         }
         [data-theme="dark"] .brand-name { color:#F8FAFC; }
         [data-theme="dark"] .brand-subtitle { color:rgba(226,232,240,0.68); }
+        [data-theme="dark"] .heatmap-detail {
+          background: rgba(15,23,42,0.9);
+          border-color: rgba(148,163,184,0.32);
+          color:#E5E7EB;
+        }
+        [data-theme="dark"] .heatmap-detail-close { color:#E5E7EB; }
         [data-theme="dark"] input {
           background: rgba(15,23,42,0.8);
           color:#F8FAFC;
           border-color: rgba(148,163,184,0.24);
+        }
+        [data-theme="dark"] .ai-input {
+          background: rgba(15,23,42,0.92);
+          color:#F8FAFC;
+          border-color: rgba(148,163,184,0.34);
+        }
+        [data-theme="dark"] .ai-input::placeholder {
+          color: rgba(203,213,225,0.62);
+        }
+        [data-theme="dark"] .ai-output {
+          background: rgba(15,23,42,0.88);
+          color:#E5E7EB;
+          border-color: rgba(148,163,184,0.28);
+        }
+        [data-theme="dark"] .ai-output-error {
+          background: rgba(127,29,29,0.32);
+          color:#FECACA;
+          border-color: rgba(248,113,113,0.45);
         }
         [data-theme="dark"] .text-\\[\\#1F2937\\],
         [data-theme="dark"] .text-\\[\\#111827\\] {
@@ -1417,7 +1464,7 @@ function IndexPopup() {
               </div>
             </div>
             <div className="flex-1 flex items-center justify-center min-h-0 px-0.5 py-1">
-              <HeatMap data={heatData} />
+              <HeatMap data={heatData} isDark={isDark} />
             </div>
           </div>
 
@@ -1462,7 +1509,7 @@ function IndexPopup() {
                   }
                 }}
                 placeholder="Ask about your usage..."
-                className="w-full h-[74px] resize-none px-3 py-2 text-[11px] leading-snug border border-black/10 rounded-lg bg-white/85 outline-none box-border"
+                className="ai-input w-full h-[74px] resize-none px-3 py-2 text-[11px] leading-snug border rounded-lg outline-none box-border"
               />
 
               <button
@@ -1481,8 +1528,8 @@ function IndexPopup() {
             <div
               className={`mt-2 flex-1 min-h-0 px-3 py-2 rounded-lg text-[11px] leading-relaxed border scroll-y whitespace-pre-wrap ${
                 aiError
-                  ? "bg-red-50 border-red-200 text-red-700"
-                  : "bg-white/85 border-black/10 text-[#1F2937]"
+                  ? "ai-output-error"
+                  : "ai-output"
               }`}>
               {aiLoading ? (
                 <span className="opacity-60">
