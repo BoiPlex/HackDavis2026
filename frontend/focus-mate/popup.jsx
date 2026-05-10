@@ -162,13 +162,13 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
             <stop offset="100%" stopColor={color} stopOpacity="0.5" />
           </linearGradient>
         </defs>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="rgba(255,255,255,0.55)" strokeWidth={stroke} fill="transparent"/>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
-          strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
-          className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
-        />
+        {progress > 0 && (
+          <circle cx={size/2} cy={size/2} r={radius}
+            stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
+            strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
+            className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1F2937]">
         <div className="text-sm opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
