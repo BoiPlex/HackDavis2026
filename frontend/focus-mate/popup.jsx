@@ -293,10 +293,10 @@ function IndexPopup() {
   const [activeProject] = useState("Deep Work")
 
   const [tabs, setTabs] = useState([
-    { id: 1, title: "Google: react hooks tutorial", url: "google.com",       contributing: false, visits: 3, secondsOn: 124, friction: 0.1 },
-    { id: 2, title: "useEffect docs",                url: "react.dev",         contributing: false, visits: 5, secondsOn: 312, friction: 0.2 },
-    { id: 3, title: "Stack Overflow: cleanup",       url: "stackoverflow.com", contributing: false, visits: 2, secondsOn: 88,  friction: 0.3 },
-    { id: 4, title: "Reddit r/programming",          url: "reddit.com",        contributing: false, visits: 8, secondsOn: 540, friction: 0.92 }
+    { id: 1, domain: "google.com",        contributing: false, visits: 3, secondsOn: 124, friction: 0.1 },
+    { id: 2, domain: "react.dev",         contributing: false, visits: 5, secondsOn: 312, friction: 0.2 },
+    { id: 3, domain: "stackoverflow.com", contributing: false, visits: 2, secondsOn: 88,  friction: 0.3 },
+    { id: 4, domain: "reddit.com",        contributing: false, visits: 8, secondsOn: 540, friction: 0.92 }
   ])
   const [newDomain, setNewDomain] = useState("")
   const [savedCount, setSavedCount] = useState(0)
@@ -445,7 +445,7 @@ function IndexPopup() {
     const v = newDomain.trim(); if (!v) return
     const cleaned = v.replace(/^https?:\/\//, "").replace(/\/$/, "")
     setTabs((ts) => [...ts, {
-      id: Date.now(), title: cleaned, url: cleaned,
+      id: Date.now(), domain: cleaned,
       contributing: true, visits: 0, secondsOn: 0, friction: 0.1
     }])
     setNewDomain("")
@@ -664,9 +664,14 @@ function IndexPopup() {
                     <input type="checkbox" checked={t.contributing}
                       onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                     <div className="flex-1 overflow-hidden">
+<<<<<<< HEAD
                       <div className="truncate font-semibold">{t.title}</div>
                       <div className="text-sm opacity-60 flex gap-1.5">
                         <span>{t.url}</span><span>·</span>
+=======
+                      <div className="truncate font-semibold">{t.domain}</div>
+                      <div className="text-[9px] opacity-60 flex gap-1.5">
+>>>>>>> 396acfdd4de402c084ac04f697afa69e0ca0582c
                         <span>{t.visits} visits</span><span>·</span>
                         <span>{formatTime(t.secondsOn)}</span>
                       </div>
@@ -684,9 +689,14 @@ function IndexPopup() {
                         <input type="checkbox" checked={t.contributing}
                           onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                         <div className="flex-1 overflow-hidden">
+<<<<<<< HEAD
                           <div className="truncate">{t.title}</div>
                           <div className="text-sm opacity-60 flex gap-1.5">
                             <span>{t.url}</span><span>·</span>
+=======
+                          <div className="truncate">{t.domain}</div>
+                          <div className="text-[9px] opacity-60 flex gap-1.5">
+>>>>>>> 396acfdd4de402c084ac04f697afa69e0ca0582c
                             <span>{t.visits} visits</span><span>·</span>
                             <span>{formatTime(t.secondsOn)}</span>
                           </div>

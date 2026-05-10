@@ -47,7 +47,7 @@ const claimTab = async (): Promise<void> => {
     console.log(logTag, "claim-tab response", {
       tabId,
       attempt: claimAttempts,
-      url: location.href
+      domain: location.hostname
     })
     if (tabId !== null) {
       claimAttempts = 0
@@ -82,12 +82,14 @@ const flush = async () => {
     return
   }
   dirty = false
+  // Payload intentionally excludes URL — the SW already has the domain via
+  // chrome.tabs and storing the full URL in chrome.storage.local would
+  // leak browsing history.
   const payload = {
     clickCount,
     keystrokeCount,
     scrollDelta,
     cursorDelta,
-    url: location.href,
     lastUpdate: Date.now()
   }
   try {
@@ -175,7 +177,7 @@ window.addEventListener("pagehide", onPageHide)
 lastScrollY = window.scrollY
 lastScrollX = window.scrollX
 console.log(logTag, "init", {
-  url: location.href,
+  domain: location.hostname,
   readyState: document.readyState
 })
 claimTab()
