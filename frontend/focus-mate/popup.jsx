@@ -1,7 +1,11 @@
-import { useState, useEffect, useRef } from "react"
 import "./style.css" // tailwind entrypoint
 
+import { useEffect, useRef, useState } from "react"
+
 const STORAGE_KEY = "focusbuddy_timer"
+const BACKEND_URL = "http://localhost:8000"
+const PRODUCTIVE_CATEGORIES = new Set(["school", "work", "productive"])
+const SUMMARY_MIN_WORK_SECS = 5 * 60
 
 const QUEST_TAGS = [
   { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
@@ -29,6 +33,12 @@ const inputClasses =
 const controlBtnClasses =
   "flex-1 p-2.5 rounded-xl border-0 font-bold text-base cursor-pointer"
 
+function localToUTC(hour, minute = 0) {
+  const d = new Date()
+  d.setHours(hour, minute, 0, 0)
+  return d.toISOString()
+}
+
 // ---- Storage abstraction ----
 const hasChrome = typeof chrome !== "undefined" && chrome?.storage?.local
 async function readStore() {
@@ -47,6 +57,98 @@ async function writeStore(s) {
     if (s === null) localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
+}
+
+async function readUserId() {
+  if (!hasChrome) return null
+  const r = await chrome.storage.local.get("user-id")
+  return r["user-id"] || null
+}
+
+function emptyHeatmap() {
+  return Array.from({ length: 24 }, () =>
+    Array.from({ length: 12 }, () => ({ focus: 0, dist: 0, distractions: 0, longestStreak: 0 }))
+  )
+}
+
+function todayKey() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+function nowISO() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+function isValidGrid(g) {
+  return Array.isArray(g) && g.length === 24 && g.every((row) => Array.isArray(row) && row.length === 12)
+}
+
+function cloneGrid(grid) {
+  return grid.map((row) => row.map((cell) => ({ ...cell })))
+}
+
+// Backend may return ISO strings without an explicit offset (Mongo/Motor default
+// is tz-naive). JS would treat those as local time, but the values are UTC —
+// so append "Z" when no offset is present.
+function parseTimestamp(ts) {
+  if (ts instanceof Date) return ts
+  if (typeof ts !== "string") return new Date(ts)
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(ts)) return new Date(ts)
+  return new Date(ts + "Z")
+}
+
+// Aggregate every log into the grid by its own hour/minute-of-day. No date
+// filtering — multi-day logs collapse onto the same 24×12 grid.
+function mergeLogsIntoGrid(grid, logs) {
+  const next = cloneGrid(grid)
+
+  const todays = []
+  for (const log of logs) {
+    const d = parseTimestamp(log.timestamp)
+    if (isNaN(d.getTime())) continue
+    const h = d.getHours()
+    const minuteOfHour = d.getMinutes()
+    const b = Math.floor(minuteOfHour / 5)
+    const minute = h * 60 + minuteOfHour
+    let focus = 0, dist = 0
+    for (const tab of (log.tabs || [])) {
+      const secs = tab.focusSeconds || 0
+      if (PRODUCTIVE_CATEGORIES.has(tab.category)) focus += secs
+      else dist += secs
+    }
+    next[h][b].focus += focus
+    next[h][b].dist += dist
+    next[h][b].distractions += log.windowMetrics?.tabChangeCount || 0
+    todays.push({ minute, h, b, focus, dist })
+  }
+
+  todays.sort((a, b) => a.minute - b.minute)
+  let runMin = -1, prevMin = -2
+  const flush = () => {
+    if (runMin < 0) return
+    const len = prevMin - runMin + 1
+    const cell = next[Math.floor(runMin / 60)][Math.floor((runMin % 60) / 5)]
+    if (len > cell.longestStreak) cell.longestStreak = len
+    runMin = -1
+  }
+  for (const m of todays) {
+    const productive = m.focus > m.dist // && m.focus > 15
+    if (productive) {
+      if (m.minute === prevMin + 1 && runMin >= 0) {
+        prevMin = m.minute
+      } else {
+        flush()
+        runMin = m.minute; prevMin = m.minute
+      }
+    } else {
+      flush()
+    }
+  }
+  flush()
+  return next
 }
 
 // ---- Math ----
@@ -197,7 +299,7 @@ function HeatMap({ data }) {
         <div
           className="flex items-center justify-center pr-1 select-none"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-          <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">Hours</span>
+          <span className="text-sm font-bold opacity-70 tracking-[2px] uppercase">Minutes</span>
         </div>
 
         <div className="flex-1">
@@ -241,7 +343,7 @@ function HeatMap({ data }) {
 
           {/* X-axis title */}
           <div className="text-sm font-bold opacity-70 tracking-[2px] uppercase text-center mt-1">
-            Minutes
+            Hours
           </div>
         </div>
       </div>
@@ -306,10 +408,12 @@ function IndexPopup() {
   ])
   const [newDomain, setNewDomain] = useState("")
   const [savedCount, setSavedCount] = useState(0)
-  const [heatData] = useState(generateMockHeatmap())
+  const [heatData, setHeatData] = useState(generateMockHeatmap)
 
   const containerRef = useRef(null)
   const hydratedRef = useRef(false)
+  const settingsLoadedRef = useRef(false)
+  const heatmapCacheRef = useRef({ grid: emptyHeatmap(), lastTimestamp: null, date: null })
 
   const isSideQuest = activeQuest?.id === "sidequest"
   const localWorkMins = isCustom ? customWork : goal.mins
@@ -379,6 +483,109 @@ function IndexPopup() {
   }, [])
 
   useEffect(() => {
+    let mounted = true
+    let intervalId = null
+
+    const fetchHeat = async (userId) => {
+      if (!mounted) return
+      try {
+        const res = await fetch(`${BACKEND_URL}/activity/${userId}`)
+        const { logs } = await res.json()
+        if (!mounted) return
+        console.log("heatmap fetch: got", logs?.length || 0, "logs")
+
+        const newGrid = mergeLogsIntoGrid(emptyHeatmap(), logs || [])
+        heatmapCacheRef.current = {
+          grid: newGrid,
+          lastTimestamp: null,
+          date: todayKey()
+        }
+        setHeatData(newGrid)
+
+        try {
+          await fetch(`${BACKEND_URL}/users/${userId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              heatmap: { date: todayKey(), grid: newGrid, lastTimestamp: null }
+            })
+          })
+        } catch (e) { console.warn("heatmap save failed", e) }
+      } catch (e) {
+        console.warn("heatmap fetch failed", e)
+      }
+    }
+
+    const init = async () => {
+      const userId = await readUserId()
+      if (!userId) { settingsLoadedRef.current = true; return }
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/users/${userId}`)
+        const { user } = await res.json()
+        const s = user?.settings || {}
+        if (!mounted) return
+        if (s.quest) setActiveQuest((prev) => prev ?? s.quest)
+        if (s.goal && typeof s.goal.mins === "number") setGoal(s.goal)
+        if (typeof s.isCustom === "boolean") setIsCustom(s.isCustom)
+        if (typeof s.customWork === "number") setCustomWork(s.customWork)
+        if (typeof s.customBreak === "number") setCustomBreak(s.customBreak)
+        if (typeof s.savedCount === "number") setSavedCount(s.savedCount)
+        if (s.view === "heatmap" || s.view === "focus") setView(s.view)
+
+        const today = todayKey()
+        const cached = user?.heatmap
+        if (cached && cached.date === today && isValidGrid(cached.grid)) {
+          heatmapCacheRef.current = {
+            grid: cached.grid,
+            lastTimestamp: cached.lastTimestamp || null,
+            date: today
+          }
+          setHeatData(cached.grid)
+        } else {
+          heatmapCacheRef.current = { grid: emptyHeatmap(), lastTimestamp: null, date: today }
+        }
+      } catch (e) { console.warn("user fetch failed", e) }
+      finally { settingsLoadedRef.current = true }
+
+      if (!mounted) return
+      await fetchHeat(userId)
+      intervalId = setInterval(() => fetchHeat(userId), 60_000)
+    }
+
+    init()
+    return () => {
+      mounted = false
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!settingsLoadedRef.current) return
+    const id = setTimeout(async () => {
+      const userId = await readUserId()
+      if (!userId) return
+      const settings = {
+        quest: activeQuest,
+        goal,
+        isCustom,
+        customWork,
+        customBreak,
+        savedCount,
+        view
+      }
+      try {
+        await fetch(`${BACKEND_URL}/users/${userId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings })
+        })
+      } catch (e) { console.warn("settings save failed", e) }
+    }, 500)
+    return () => clearTimeout(id)
+  }, [activeQuest, goal, isCustom, customWork, customBreak, savedCount, view])
+
+  useEffect(() => {
     const distract = tabs.find((t) => !t.contributing && t.friction > 0.85)
     if (distract && timer?.phase === "work" && !timer?.pausedAt) {
       const t = setTimeout(() => setShowNudge(true), 6000)
@@ -443,7 +650,45 @@ function IndexPopup() {
     }
     await writeStore(next); setTimer(next)
   }
-  const resetQuest = async () => { await writeStore(null); setTimer(null) }
+  const resetQuest = async () => {
+    setAiSummary(null)
+    setAiLoading(false)
+    await writeStore(null)
+    setTimer(null)
+  }
+
+  const requestSummary = async () => {
+    if (aiLoading || aiSummary) return
+    setAiLoading(true)
+    try {
+      const userId = await readUserId()
+      const res = await fetch(`${BACKEND_URL}/activity/${userId}`)
+      const { logs } = await res.json()
+      const sessionStart = timer?.startedAt
+        ? new Date(timer.startedAt - (timer.workSecs + (timer.breakSecs || 0)) * 1000)
+        : new Date(Date.now() - 60 * 60 * 1000)
+      const sessionLogs = (logs || []).filter(
+        (l) => new Date(l.timestamp) >= sessionStart
+      )
+      const payload = {
+        quest: timer?.quest,
+        workSecs: timer?.workSecs,
+        breakSecs: timer?.breakSecs,
+        logs: sessionLogs
+      }
+      const sumRes = await fetch(`${BACKEND_URL}/ai/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      const data = await sumRes.json()
+      setAiSummary({ content: data.content })
+    } catch (e) {
+      setAiSummary({ content: "Couldn't generate summary." })
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const toggleContributing = (id) =>
     setTabs((ts) => ts.map((t) => t.id === id ? { ...t, contributing: !t.contributing } : t))
@@ -486,6 +731,8 @@ function IndexPopup() {
       : phase === "work"  ? (timer?.hasBreak && timer?.breakSecs > 0 ? `then ${Math.round(timer.breakSecs/60)}m break` : "no break this round")
       : phase === "break" ? "rest your brain"
       : "🎉 nice work"
+
+  const summaryEligible = phase === "done" && (timer?.workSecs || 0) >= SUMMARY_MIN_WORK_SECS
 
   return (
     <div ref={containerRef}
@@ -797,6 +1044,23 @@ function IndexPopup() {
                 )}
               </div>
             </div>
+
+            {/* {summaryEligible && (
+              <div className="card shrink-0">
+                <div className="text-sm font-bold opacity-70 mb-1">🤖 SESSION SUMMARY</div>
+                {aiSummary ? (
+                  <div className="text-sm whitespace-pre-wrap">{aiSummary.content}</div>
+                ) : aiLoading ? (
+                  <div className="text-sm opacity-60 italic">Analyzing your session…</div>
+                ) : (
+                  <button
+                    onClick={requestSummary}
+                    className="px-3 py-1.5 rounded-lg border-0 bg-[#1F2937] text-white text-sm font-bold cursor-pointer">
+                    ✨ Get session summary
+                  </button>
+                )}
+              </div>
+            )} */}
 
             {showNudge && (
               <div className="card bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B] shrink-0">

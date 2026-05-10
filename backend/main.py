@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from models import *
 from llm import ask_backboard
 
 LIMIT = 100 # Limit when querying all documents
+ACTIVITY_LIMIT = 10000 # Per-user activity logs can be much larger than the global LIMIT
 
 app = FastAPI()
 
@@ -91,10 +93,19 @@ async def get_activity_logs():
     }
 
 @app.get("/activity/{userId}")
-async def get_activity_logs(userId: str):
-    logs = await db.activity_logs.find({"userId": userId}).to_list(length=LIMIT)
+async def get_activity_logs(userId: str, since: Optional[str] = None):
+    query: dict = {"userId": userId}
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            query["timestamp"] = {"$gt": since_dt}
+        except (ValueError, TypeError):
+            pass
+
+    cursor = db.activity_logs.find(query).sort("timestamp", 1)
+    logs = await cursor.to_list(length=ACTIVITY_LIMIT)
     logs = [serialize_doc(log) for log in logs]
-    
+
     return {
         "count": len(logs),
         "logs": logs
