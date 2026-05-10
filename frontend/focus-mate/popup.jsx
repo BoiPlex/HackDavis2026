@@ -433,7 +433,7 @@ function IndexPopup() {
             </div>
             <div>
               <div className="font-['Playfair_Display',_serif] text-[22px] font-bold leading-none tracking-normal text-[#111827]">
-                FocusBuddy
+                FlowState
               </div>
               <div className="mt-[3px] text-[10px] font-[650] text-[#1F2937]/60 tracking-normal">
                 {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
