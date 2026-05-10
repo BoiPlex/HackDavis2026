@@ -549,6 +549,11 @@ function IndexPopup() {
   const [savedCount, setSavedCount] = useState(0)
   const [heatData, setHeatData] = useState(emptyHeatmap())
 
+  const [aiQuestion, setAiQuestion] = useState("What was my biggest distraction today?")
+  const [aiAnswer, setAiAnswer] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState("")
+
   const containerRef = useRef(null)
   const hydratedRef = useRef(false)
   const settingsLoadedRef = useRef(false)
@@ -1151,6 +1156,51 @@ function IndexPopup() {
     )
   }
 
+
+  const askUsageQuestion = async () => {
+    const question = aiQuestion.trim()
+    if (!question || aiLoading) return
+
+    setAiLoading(true)
+    setAiError("")
+
+    try {
+      const userId = await readUserId()
+      if (!userId) {
+        throw new Error("No user ID found yet. Open the extension once after login, then try again.")
+      }
+
+      const response = await fetch(
+        `${BACKEND_URL}/ai/usage/${encodeURIComponent(userId)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question })
+        }
+      )
+
+      const responseText = await response.text()
+      let data
+      try {
+        data = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        data = {
+          detail: responseText || "The backend returned a non-JSON response."
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Could not get an insight yet.")
+      }
+
+      setAiAnswer(data.answer || "No answer returned yet.")
+    } catch (error) {
+      setAiError(error?.message || "Could not reach the AI coach.")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   // ---- Display values ----
   const phase = timer?.phase || "idle"
   const running =
@@ -1339,8 +1389,9 @@ function IndexPopup() {
 
       {/* ============== HEATMAP (DEFAULT) ============== */}
       {view === "heatmap" && (
-        <div className="flex flex-col flex-1 min-h-0 gap-2.5">
-          <div className="card flex-1 flex flex-col min-h-0">
+        <div className="grid grid-cols-[minmax(0,1fr)_230px] flex-1 min-h-0 gap-2.5">
+          <div className="flex flex-col min-h-0 gap-2.5">
+            <div className="card flex-1 flex flex-col min-h-0">
             <div className="flex justify-between items-center mb-2 gap-3">
               <div className="text-base font-bold opacity-70 tracking-[1px]">
                 📊 ACTIVITY HEAT MAP
@@ -1370,9 +1421,9 @@ function IndexPopup() {
             </div>
           </div>
 
-          <button
-            onClick={() => setView("focus")}
-            className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-base cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
+            <button
+              onClick={() => setView("focus")}
+              className="p-3 border-0 rounded-xl bg-[#1F2937] text-white font-bold text-base cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.15)] shrink-0 transition-transform duration-[120ms]"
             onMouseDown={(e) =>
               (e.currentTarget.style.transform = "scale(0.98)")
             }
@@ -1381,6 +1432,71 @@ function IndexPopup() {
               ? `▶ Resume Focus Session · ${timeLeft}`
               : "✨ Start a Focus Session"}
           </button>
+          </div>
+
+          <div className="card flex flex-col min-h-0">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="text-[11px] font-bold opacity-70 tracking-[1px]">
+                AI USAGE COACH
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setAiQuestion(
+                    "Summarize my focus patterns and give me one recommendation."
+                  )
+                }
+                className="icon-btn">
+                Suggest
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 shrink-0">
+              <textarea
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    askUsageQuestion()
+                  }
+                }}
+                placeholder="Ask about your usage..."
+                className="w-full h-[74px] resize-none px-3 py-2 text-[11px] leading-snug border border-black/10 rounded-lg bg-white/85 outline-none box-border"
+              />
+
+              <button
+                type="button"
+                onClick={askUsageQuestion}
+                disabled={aiLoading || !aiQuestion.trim()}
+                className={`w-full px-3 py-2 rounded-lg border-0 text-white text-[11px] font-bold ${
+                  aiLoading || !aiQuestion.trim()
+                    ? "bg-black/15 cursor-not-allowed"
+                    : "bg-[#1F2937] cursor-pointer"
+                }`}>
+                {aiLoading ? "Thinking..." : "Ask"}
+              </button>
+            </div>
+
+            <div
+              className={`mt-2 flex-1 min-h-0 px-3 py-2 rounded-lg text-[11px] leading-relaxed border scroll-y whitespace-pre-wrap ${
+                aiError
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-white/85 border-black/10 text-[#1F2937]"
+              }`}>
+              {aiLoading ? (
+                <span className="opacity-60">
+                  Reading your recent activity...
+                </span>
+              ) : aiError || aiAnswer ? (
+                aiError || aiAnswer
+              ) : (
+                <span className="opacity-55">
+                  Ask a question to see personalized usage insight here.
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
