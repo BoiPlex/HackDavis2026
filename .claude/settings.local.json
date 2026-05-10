@@ -14,7 +14,8 @@
       "PowerShell(cd \"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\focus-mate\"; Get-ChildItem -File -Recurse | Where-Object {$_.FullName -notmatch '\\(plasmo|build|node_modules|next|cache\\)' -and \\($_.Name -eq 'package.json' -or $_.Name -eq 'tsconfig.json' -or $_.Name -match '\\\\.env'\\)} | Select-Object -ExpandProperty FullName | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\\" -Recurse -File | Where-Object {$_.Name -match \"\\(manifest|config|\\\\.env\\)\" -or $_.Extension -eq \".json\"} | Select-Object FullName | head -20)",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\\" -Recurse -File | Where-Object {$_.Name -match \"\\(manifest|config|\\\\.env\\)\" -or $_.Extension -eq \".json\"} | Select-Object FullName | Select-Object -First 20)",
-      "PowerShell(cd \"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\focus-mate\"; Get-ChildItem -Recurse | Where-Object {$_.FullName -notmatch '\\(plasmo|build|node_modules|next|cache\\)' -and -not $_.PSIsContainer} | ForEach-Object { $_.FullName.Replace\\(\"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\focus-mate\\\\\", \"\"\\) } | Sort-Object)"
+      "PowerShell(cd \"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\focus-mate\"; Get-ChildItem -Recurse | Where-Object {$_.FullName -notmatch '\\(plasmo|build|node_modules|next|cache\\)' -and -not $_.PSIsContainer} | ForEach-Object { $_.FullName.Replace\\(\"c:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026\\\\frontend\\\\focus-mate\\\\\", \"\"\\) } | Sort-Object)",
+      "Bash(ls C:\\\\Users\\\\endpl\\\\OneDrive\\\\Desktop\\\\Projects\\\\HackDavis2026 *)"
     ]
   }
 }

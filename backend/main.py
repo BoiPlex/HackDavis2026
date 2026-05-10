@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -195,6 +196,11 @@ async def post_activity_log(userId: str, snapshot: dict = Body(default_factory=d
 
     await db.activity_logs.insert_one(snapshot)
 
+    try:
+        await _increment_user_tab_stats(userId, snapshot)
+    except Exception as error:
+        print(f"tab stat increment failed for {userId}: {error}")
+
     return {"message": "Successfully added activity log"}
 
 
@@ -218,6 +224,54 @@ def serialize_mongo_document(value):
 
 def serialize_doc(doc):
     return serialize_mongo_document(doc)
+
+
+def _normalize_domain(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    trimmed = value.strip().lower()
+    if not trimmed:
+        return ""
+    candidate = trimmed if trimmed.startswith(("http://", "https://")) else f"https://{trimmed}"
+    try:
+        host = urlparse(candidate).hostname or ""
+    except Exception:
+        host = trimmed.replace("https://", "").replace("http://", "").split("/")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+async def _increment_user_tab_stats(userId: str, snapshot: dict) -> None:
+    snapshot_tabs = snapshot.get("tabs") or snapshot.get("Tabs") or []
+    if not snapshot_tabs:
+        return
+
+    per_domain: dict[str, dict[str, int]] = {}
+    for tab in snapshot_tabs:
+        domain = _normalize_domain(tab.get("domain") or tab.get("Domain") or "")
+        if not domain:
+            continue
+        agg = per_domain.setdefault(domain, {"secondsOn": 0, "visits": 0})
+        agg["secondsOn"] += int(tab.get("focusSeconds") or 0)
+        agg["visits"] += int(tab.get("tabSwitchIn") or 0)
+
+    if not per_domain:
+        return
+
+    for domain, stats in per_domain.items():
+        if stats["secondsOn"] == 0 and stats["visits"] == 0:
+            continue
+        await db.users.update_one(
+            {"userId": userId},
+            {
+                "$inc": {
+                    "settings.tabs.$[elem].secondsOn": stats["secondsOn"],
+                    "settings.tabs.$[elem].visits": stats["visits"],
+                }
+            },
+            array_filters=[{"elem.url": domain}],
+        )
 
 
 def summarize_activity_logs(logs: list[dict]):
