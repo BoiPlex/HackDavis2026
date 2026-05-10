@@ -419,7 +419,7 @@ function IndexPopup() {
     <div ref={containerRef}
       style={{
         position: "relative", width: 760, height: 580, padding: 14,
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: "'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
         background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 130%)`,
         color: "#1F2937", transition: "background 1.2s ease",
         overflow: "hidden", boxSizing: "border-box",
@@ -445,6 +445,24 @@ function IndexPopup() {
         .icon-btn { border:none; background: rgba(0,0,0,0.06); padding:5px 10px; border-radius:999px;
           font-size:11px; font-weight:700; cursor:pointer; color:#1F2937; transition: background 150ms ease; }
         .icon-btn:hover { background: rgba(0,0,0,0.12); }
+        .brand-lockup { display:flex; align-items:center; gap:9px; }
+        .brand-mark {
+          width:30px; height:30px; border-radius:9px;
+          display:flex; align-items:center; justify-content:center;
+          background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+          color:#92400E; font-size:17px;
+          box-shadow: 0 8px 18px rgba(245,158,11,0.22);
+        }
+        .brand-name {
+          font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+          font-size:22px; font-weight:700; line-height:1;
+          letter-spacing:0;
+          color:#111827;
+        }
+        .brand-subtitle {
+          margin-top:3px; font-size:10px; font-weight:650;
+          color:rgba(31,41,55,0.62); letter-spacing:0;
+        }
       `}</style>
 
       {sparkles.map((s) => <Sparkle key={s.id} x={s.x} y={s.y} />)}
@@ -455,10 +473,13 @@ function IndexPopup() {
           {view === "focus" && (
             <button className="icon-btn" onClick={() => setView("heatmap")}>← Back</button>
           )}
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>🧠 FocusBuddy</div>
-            <div style={{ fontSize: 10, opacity: 0.7 }}>
-              {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
+          <div className="brand-lockup">
+            <div className="brand-mark">💡</div>
+            <div>
+              <div className="brand-name">FocusBuddy</div>
+              <div className="brand-subtitle">
+                {view === "heatmap" ? "Today's focus rhythm" : "Your supportive coach"}
+              </div>
             </div>
           </div>
         </div>
