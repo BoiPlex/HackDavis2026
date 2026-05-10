@@ -413,10 +413,12 @@ function generateMockHeatmap() {
   return grid
 }
 
-function heatColor(value, maxTotal, rgb) {
-  if (!value || value <= 0 || maxTotal <= 0) return "rgba(0,0,0,0.04)"
+function heatColor(value, maxTotal, rgb, isDark = false) {
+  if (!value || value <= 0 || maxTotal <= 0) {
+    return isDark ? "rgba(148,163,184,0.16)" : "rgba(0,0,0,0.04)"
+  }
   const ratio = Math.min(1, value / maxTotal)
-  const a = 0.15 + ratio * 0.85
+  const a = isDark ? 0.28 + ratio * 0.72 : 0.15 + ratio * 0.85
   return `rgba(${rgb}, ${a})`
 }
 
@@ -696,12 +698,19 @@ function HeatMap({
                     type="button"
                     onClick={() => setSelected({ h, b })}
                     title="Click for details"
-                    className={`h-5 rounded-[3px] border-0 cursor-pointer transition-all duration-150 hover:scale-[1.25] hover:z-10 hover:shadow-md ${isSelected ? "ring-2 ring-gray-800 ring-offset-1 scale-[1.15]" : ""}`}
+                    className={`h-5 rounded-[3px] border-0 cursor-pointer transition-all duration-150 hover:scale-[1.25] hover:z-10 hover:shadow-md ${
+                      isSelected
+                        ? isDark
+                          ? "ring-2 ring-slate-100 ring-offset-1 ring-offset-slate-950 scale-[1.15]"
+                          : "ring-2 ring-gray-800 ring-offset-1 scale-[1.15]"
+                        : ""
+                    }`}
                     style={{
                       background: heatColor(
                         cellMetricValue(cell, metric),
                         maxTotal,
-                        activeMetric.rgb
+                        activeMetric.rgb,
+                        isDark
                       )
                     }}
                   />
@@ -735,14 +744,13 @@ function HeatMap({
       {selected && selectedCell && (
         <>
           <div
-            className="heatmap-detail fixed inset-0 bg-black/40 z-40 animate-[fadeIn_150ms_ease]"
+            className="fixed inset-0 bg-black/40 z-40 animate-[fadeIn_150ms_ease]"
             onClick={() => setSelected(null)}
           />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
           <div
             role="dialog"
-            className="px-5 py-5 rounded-2xl bg-white border border-black/10 shadow-2xl animate-[fadeIn_180ms_ease] min-w-[420px] max-w-[560px]"
-            style={{ background: "rgba(255,255,255,0.98)" }}>
+            className="heatmap-detail px-5 py-5 rounded-2xl shadow-2xl animate-[fadeIn_180ms_ease] min-w-[420px] max-w-[560px]">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-baseline gap-2">
                 <span className="font-extrabold text-xl tabular-nums">
@@ -762,43 +770,43 @@ function HeatMap({
                 type="button"
                 onClick={() => setSelected(null)}
                 aria-label="Close"
-                className="text-lg opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent shrink-0">
+                className="heatmap-detail-close text-lg opacity-50 hover:opacity-100 cursor-pointer border-0 bg-transparent shrink-0">
                 ✕
               </button>
             </div>
             <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-base">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Engagement</span>
+                <span className="heatmap-detail-label">Engagement</span>
                 <span className="font-extrabold text-[#3B82F6] tabular-nums">
                   {Math.round(selectedCell.engagement || 0)}%
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Tab changes</span>
+                <span className="heatmap-detail-label">Tab changes</span>
                 <span className="font-extrabold text-[#F59E0B] tabular-nums">
                   {selectedCell.tabChangeCount || 0}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Clicks</span>
+                <span className="heatmap-detail-label">Clicks</span>
                 <span className="font-extrabold text-[#8B5CF6] tabular-nums">
                   {selectedCell.clickCount || 0}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Keystrokes</span>
+                <span className="heatmap-detail-label">Keystrokes</span>
                 <span className="font-extrabold text-[#EC4899] tabular-nums">
                   {selectedCell.keystrokeCount || 0}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Scroll</span>
+                <span className="heatmap-detail-label">Scroll</span>
                 <span className="font-extrabold text-[#14B8A6] tabular-nums">
                   {Math.round(selectedCell.scrollDelta || 0)}px
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="opacity-75">Cursor</span>
+                <span className="heatmap-detail-label">Cursor</span>
                 <span className="font-extrabold text-[#6366F1] tabular-nums">
                   {Math.round(selectedCell.cursorDelta || 0)}px
                 </span>
@@ -811,20 +819,20 @@ function HeatMap({
                   )
                 : []
               return (
-                <div className="mt-3 pt-3 border-t border-black/10">
+                <div className="heatmap-detail-section mt-3 pt-3 border-t">
                   <div className="text-xs font-bold opacity-60 tracking-[1px] uppercase mb-1.5">
                     Active tabs ({cellTabs.length})
                   </div>
                   {cellTabs.length === 0 ? (
-                    <div className="text-sm opacity-50 italic">
+                    <div className="heatmap-detail-empty text-sm italic">
                       No active tabs in this window.
                     </div>
                   ) : (
-                    <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-1">
+                    <div className="heatmap-detail-tab-list max-h-40 overflow-y-auto pr-1 flex flex-col gap-1">
                       {cellTabs.map((t) => (
                         <div
                           key={t.domain}
-                          className="flex items-baseline justify-between gap-3 text-sm">
+                          className="heatmap-detail-tab-row flex items-baseline justify-between gap-3 text-sm">
                           <span className="truncate font-semibold">
                             {t.domain}
                           </span>
@@ -1646,11 +1654,26 @@ function IndexPopup() {
         .theme-toggle:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(31,41,55,0.12); }
         .theme-pill { color:#1F2937; }
         .heatmap-detail {
-          background: rgba(255,255,255,0.85);
+          background: rgba(255,255,255,0.98);
           border: 1px solid rgba(0,0,0,0.1);
           color:#1F2937;
         }
         .heatmap-detail-close { color:#1F2937; }
+        .heatmap-detail-label {
+          color: rgba(31,41,55,0.75);
+        }
+        .heatmap-detail-section {
+          border-color: rgba(0,0,0,0.1);
+        }
+        .heatmap-detail-empty {
+          color: rgba(31,41,55,0.5);
+        }
+        .heatmap-detail-tab-list {
+          scrollbar-color: rgba(31,41,55,0.22) transparent;
+        }
+        .heatmap-detail-tab-row {
+          color:#1F2937;
+        }
         .ai-input {
           background: rgba(255,255,255,0.85);
           color:#1F2937;
@@ -1699,11 +1722,26 @@ function IndexPopup() {
         [data-theme="dark"] .brand-name { color:#F8FAFC; }
         [data-theme="dark"] .brand-subtitle { color:rgba(226,232,240,0.68); }
         [data-theme="dark"] .heatmap-detail {
-          background: rgba(15,23,42,0.9);
+          background: rgba(15,23,42,0.96);
           border-color: rgba(148,163,184,0.32);
           color:#E5E7EB;
         }
         [data-theme="dark"] .heatmap-detail-close { color:#E5E7EB; }
+        [data-theme="dark"] .heatmap-detail-label {
+          color: rgba(226,232,240,0.76);
+        }
+        [data-theme="dark"] .heatmap-detail-section {
+          border-color: rgba(148,163,184,0.22);
+        }
+        [data-theme="dark"] .heatmap-detail-empty {
+          color: rgba(203,213,225,0.62);
+        }
+        [data-theme="dark"] .heatmap-detail-tab-list {
+          scrollbar-color: rgba(203,213,225,0.28) transparent;
+        }
+        [data-theme="dark"] .heatmap-detail-tab-row {
+          color:#E5E7EB;
+        }
         [data-theme="dark"] input {
           background: rgba(15,23,42,0.8);
           color:#F8FAFC;
