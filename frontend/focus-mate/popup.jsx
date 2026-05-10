@@ -544,44 +544,7 @@ function IndexPopup() {
   const [showNudge, setShowNudge] = useState(false)
   const [activeProject] = useState("Deep Work")
 
-  const [tabs, setTabs] = useState([
-    {
-      id: 1,
-      title: "Google: react hooks tutorial",
-      url: "google.com",
-      contributing: false,
-      visits: 3,
-      secondsOn: 124,
-      friction: 0.1
-    },
-    {
-      id: 2,
-      title: "useEffect docs",
-      url: "react.dev",
-      contributing: false,
-      visits: 5,
-      secondsOn: 312,
-      friction: 0.2
-    },
-    {
-      id: 3,
-      title: "Stack Overflow: cleanup",
-      url: "stackoverflow.com",
-      contributing: false,
-      visits: 2,
-      secondsOn: 88,
-      friction: 0.3
-    },
-    {
-      id: 4,
-      title: "Reddit r/programming",
-      url: "reddit.com",
-      contributing: false,
-      visits: 8,
-      secondsOn: 540,
-      friction: 0.92
-    }
-  ])
+  const [tabs, setTabs] = useState([])
   const [newDomain, setNewDomain] = useState("")
   const [savedCount, setSavedCount] = useState(0)
   const [heatData, setHeatData] = useState(emptyHeatmap())
@@ -629,7 +592,7 @@ function IndexPopup() {
       }
     })
 
-    // ✅ TRAIL DOMAINS (merged feature)
+    // Trail domains
     readTrailDomains().then((savedDomains) => {
       if (!mounted || !savedDomains?.length) return
 
@@ -1099,7 +1062,7 @@ function IndexPopup() {
   }
 
   const savedDomainTabs = tabs.filter(
-    (t) => t.savedDomain && t.contributing === null
+    (t) => t.contributing === null
   )
   const contributingTabs = tabs.filter((t) => t.contributing === true)
   const sideQuestTabs = tabs.filter((t) => t.contributing === false)
@@ -1550,7 +1513,7 @@ function IndexPopup() {
                         <span>{formatTime(t.secondsOn)}</span>
                       </div>
                     </div>
-                    {t.savedDomain && (
+                    {(
                       <button
                         type="button"
                         onClick={() => moveSavedDomainToStored(t.id)}
@@ -1582,7 +1545,7 @@ function IndexPopup() {
                             <span>{formatTime(t.secondsOn)}</span>
                           </div>
                         </div>
-                        {t.savedDomain && (
+                        {(
                           <button
                             type="button"
                             onClick={() => moveSavedDomainToStored(t.id)}
