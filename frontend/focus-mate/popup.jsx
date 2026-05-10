@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import "./style.css" // tailwind entrypoint
 
 const THEME_KEY = "flowstate_theme"
+const MICRO_GOAL_KEY = "flowstate_micro_goal"
 
 const QUEST_TAGS = [
   { id: "research",  label: "🔍 Research",   color: "#7C5CFF" },
@@ -95,6 +96,18 @@ async function readTheme() {
 async function writeTheme(theme) {
   if (hasChrome) await chrome.storage.local.set({ [THEME_KEY]: theme })
   else localStorage.setItem(THEME_KEY, theme)
+}
+async function readMicroGoal() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(MICRO_GOAL_KEY)
+    return r[MICRO_GOAL_KEY] || null
+  }
+  try { return JSON.parse(localStorage.getItem(MICRO_GOAL_KEY) || "null") }
+  catch { return null }
+}
+async function writeMicroGoal(value) {
+  if (hasChrome) await chrome.storage.local.set({ [MICRO_GOAL_KEY]: value })
+  else localStorage.setItem(MICRO_GOAL_KEY, JSON.stringify(value))
 }
 
 // ---- Math ----
@@ -198,13 +211,13 @@ function HeroRing({ progress, size = 170, stroke = 14, color, primaryLabel, subL
             <stop offset="100%" stopColor={color} stopOpacity="0.5" />
           </linearGradient>
         </defs>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="rgba(255,255,255,0.55)" strokeWidth={stroke} fill="transparent"/>
-        <circle cx={size/2} cy={size/2} r={radius}
-          stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
-          strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
-          className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
-        />
+        {progress > 0 && (
+          <circle cx={size/2} cy={size/2} r={radius}
+            stroke="url(#ringGrad)" strokeWidth={stroke} fill="transparent"
+            strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
+            className="[transition:stroke-dashoffset_0.6s_linear] [transform:rotate(-90deg)] [transform-origin:50%_50%]"
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1F2937]">
         <div className="text-sm opacity-60 font-bold tracking-[2px] uppercase">{mode}</div>
@@ -338,6 +351,7 @@ function IndexPopup() {
   const [isCustom, setIsCustom] = useState(false)
   const [customWork, setCustomWork] = useState(20)
   const [customBreak, setCustomBreak] = useState(7)
+  const [pendingMicroGoal, setPendingMicroGoal] = useState(null)
 
   const [timer, setTimer] = useState(null)
   const [, force] = useState(0)
@@ -362,6 +376,7 @@ function IndexPopup() {
 
   const isSideQuest = activeQuest?.id === "sidequest"
   const isDark = theme === "dark"
+  const hasPausedTimer = !!timer?.pausedAt && (timer.phase === "work" || timer.phase === "break")
   const localWorkMins = isCustom ? customWork : goal.mins
   const localBreakMins = isSideQuest ? 0 : (isCustom ? customBreak : goal.break)
 
@@ -371,6 +386,7 @@ function IndexPopup() {
     readTheme().then((savedTheme) => {
       if (mounted) setTheme(savedTheme === "dark" ? "dark" : "light")
     })
+<<<<<<< HEAD
 
     // Load popup state from background
     requestStateFromBackground().then((popupState) => {
@@ -386,6 +402,22 @@ function IndexPopup() {
       }
     })
 
+=======
+    readMicroGoal().then((savedGoal) => {
+      if (!mounted || !savedGoal) return
+      if (savedGoal.isCustom) {
+        setIsCustom(true)
+        setCustomWork(savedGoal.customWork || 20)
+        setCustomBreak(savedGoal.customBreak ?? 7)
+        return
+      }
+      const savedPreset = MICRO_GOALS.find((g) => g.mins === savedGoal.mins && g.break === savedGoal.break)
+      if (savedPreset) {
+        setGoal(savedPreset)
+        setIsCustom(false)
+      }
+    })
+>>>>>>> 0d34a43d85c029af19eeda1c972cd490b242db38
     const sync = async () => {
       const s = await readStore()
       if (!mounted) return
@@ -415,6 +447,91 @@ function IndexPopup() {
     const next = isDark ? "light" : "dark"
     setTheme(next)
     await writeTheme(next)
+  }
+  const applyMicroGoal = async (selection) => {
+    const nextWork = selection.isCustom ? selection.customWork : selection.goal.mins
+    const nextBreak = isSideQuest ? 0 : (selection.isCustom ? selection.customBreak : selection.goal.break)
+
+    if (selection.isCustom) {
+      setIsCustom(true)
+      setCustomWork(nextWork)
+      setCustomBreak(nextBreak)
+      await writeMicroGoal({ isCustom: true, customWork: nextWork, customBreak: nextBreak })
+    } else {
+      setGoal(selection.goal)
+      setIsCustom(false)
+      await writeMicroGoal({ isCustom: false, mins: selection.goal.mins, break: selection.goal.break })
+    }
+
+    if (hasPausedTimer) {
+      const nextTimer = {
+        ...timer,
+        phase: "done",
+        startedAt: null,
+        pausedAt: null,
+        accumulatedPaused: 0,
+        workSecs: nextWork * 60,
+        breakSecs: nextBreak * 60,
+        hasBreak: !isSideQuest
+      }
+      await writeStore(nextTimer)
+      setTimer(nextTimer)
+    }
+
+    setPendingMicroGoal(null)
+  }
+  const chooseMicroGoal = async (nextGoal) => {
+    const selection = {
+      isCustom: false,
+      goal: nextGoal,
+      label: `${nextGoal.mins}m${isSideQuest ? "" : ` + ${nextGoal.break}m break`}`
+    }
+    if (hasPausedTimer) {
+      setPendingMicroGoal(selection)
+      return
+    }
+    await applyMicroGoal(selection)
+  }
+  const chooseCustomGoal = async () => {
+    setIsCustom(true)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork,
+        customBreak,
+        label: `${customWork}m${isSideQuest ? "" : ` + ${customBreak}m break`}`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork, customBreak })
+  }
+  const updateCustomWork = async (value) => {
+    const next = Math.max(1, parseInt(value) || 1)
+    setCustomWork(next)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork: next,
+        customBreak,
+        label: `${next}m${isSideQuest ? "" : ` + ${customBreak}m break`}`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork: next, customBreak })
+  }
+  const updateCustomBreak = async (value) => {
+    const next = Math.max(0, parseInt(value) || 0)
+    setCustomBreak(next)
+    if (hasPausedTimer) {
+      setPendingMicroGoal({
+        isCustom: true,
+        customWork,
+        customBreak: next,
+        label: `${customWork}m + ${next}m break`
+      })
+      return
+    }
+    await writeMicroGoal({ isCustom: true, customWork, customBreak: next })
   }
 
   // ---- Local tick ----
@@ -524,6 +641,7 @@ function IndexPopup() {
   }
   const resumeQuest = async () => {
     if (!timer || !timer.pausedAt) return
+    setPendingMicroGoal(null)
     const next = {
       ...timer,
       accumulatedPaused: (timer.accumulatedPaused || 0) + (Date.now() - timer.pausedAt),
@@ -531,7 +649,11 @@ function IndexPopup() {
     }
     await writeStore(next); setTimer(next)
   }
-  const resetQuest = async () => { await writeStore(null); setTimer(null) }
+  const resetQuest = async () => {
+    setPendingMicroGoal(null)
+    await writeStore(null)
+    setTimer(null)
+  }
 
   const toggleContributing = (id) =>
     setTabs((ts) => ts.map((t) => t.id === id ? { ...t, contributing: !t.contributing } : t))
@@ -874,10 +996,12 @@ function IndexPopup() {
     below them as the bottom-middle slot. */}
 <div className="grid grid-cols-4 gap-1.5">
   {MICRO_GOALS.map((g) => {
-    const selected = !isCustom && goal.mins === g.mins
+    const selected = pendingMicroGoal?.isCustom === false
+      ? pendingMicroGoal.goal.mins === g.mins
+      : !isCustom && goal.mins === g.mins
     return (
       <button key={g.mins}
-        onClick={() => { setGoal(g); setIsCustom(false) }}
+        onClick={() => chooseMicroGoal(g)}
         disabled={running}
         className={`col-span-2 border-0 px-2 py-2.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 ${running ? "cursor-not-allowed" : "cursor-pointer"} ${selected ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
         <span className="text-[1rem]">{g.mins}m</span>
@@ -889,8 +1013,8 @@ function IndexPopup() {
   })}
 
   {/* Custom — centered under the 2×2 */}
-  <button onClick={() => setIsCustom(true)} disabled={running}
-    className={`col-start-2 col-span-2 border-0 px- py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 min-h-[38px] ${running ? "cursor-not-allowed" : "cursor-pointer"} ${isCustom ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+  <button onClick={chooseCustomGoal} disabled={running}
+    className={`col-start-2 col-span-2 border-0 px- py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 min-h-[38px] ${running ? "cursor-not-allowed" : "cursor-pointer"} ${pendingMicroGoal?.isCustom || (!pendingMicroGoal && isCustom) ? "bg-[#1F2937] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
     <span className="text-[1.1rem]">⚙</span>
     <span className="text-[0.875rem] opacity-70 font-medium">custom</span>
   </button>
@@ -901,18 +1025,26 @@ function IndexPopup() {
                     <label className="text-sm font-semibold opacity-70">
                       Work
                       <input type="number" min={1} max={180} value={customWork}
-                        onChange={(e) => setCustomWork(Math.max(1, parseInt(e.target.value) || 1))}
+                        onChange={(e) => updateCustomWork(e.target.value)}
                         disabled={running} className={inputClasses}/> m
                     </label>
                     {!isSideQuest && (
                       <label className="text-sm font-semibold opacity-70">
                         Break
                         <input type="number" min={0} max={60} value={customBreak}
-                          onChange={(e) => setCustomBreak(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={(e) => updateCustomBreak(e.target.value)}
                           disabled={running} className={inputClasses}/> m
                       </label>
                     )}
                   </div>
+                )}
+                {pendingMicroGoal && (
+                  <button
+                    type="button"
+                    onClick={() => applyMicroGoal(pendingMicroGoal)}
+                    className="mt-2 w-full border-0 rounded-lg bg-[#F59E0B] text-white text-sm font-bold px-3 py-2 cursor-pointer shadow-[0_4px_12px_rgba(245,158,11,0.28)]">
+                    Confirm new time: {pendingMicroGoal.label}
+                  </button>
                 )}
               </div>
 
