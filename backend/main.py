@@ -70,7 +70,7 @@ async def ai_usage_question(userId: str, payload: dict = Body(default_factory=di
     message = f"""
     You are a concise productivity coach for a browser activity tracker.
     Answer the user's question using only the compact usage summary below and user data below.
-    User data contains relevant information about productive and unproductive domains.
+    User data contains relevant information about the current quest (Research, Work, etc), goal, productive (contributing) and unproductive domains in tabs, 24 hour heatmap, and the current pomodoro timer state.
     Be specific about domains, focus/idle time, tab switching, clicks, keystrokes, and scrolling when relevant.
     If the summary does not contain enough evidence, say what data is missing.
     Naturally convert time into the smallest unit of time possible.
