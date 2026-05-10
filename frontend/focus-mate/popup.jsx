@@ -4,6 +4,7 @@ import "./style.css" // tailwind entrypoint
 const STORAGE_KEY = "focusbuddy_timer"
 const THEME_KEY = "flowstate_theme"
 const MICRO_GOAL_KEY = "flowstate_micro_goal"
+const TRAIL_DOMAINS_KEY = "flowstate_trail_domains"
 
 const QUEST_TAGS = [
   { id: "research", label: "🔍 Research", color: "#7C5CFF" },
@@ -72,6 +73,48 @@ async function readMicroGoal() {
 async function writeMicroGoal(value) {
   if (hasChrome) await chrome.storage.local.set({ [MICRO_GOAL_KEY]: value })
   else localStorage.setItem(MICRO_GOAL_KEY, JSON.stringify(value))
+}
+async function readTrailDomains() {
+  if (hasChrome) {
+    const r = await chrome.storage.local.get(TRAIL_DOMAINS_KEY)
+    return Array.isArray(r[TRAIL_DOMAINS_KEY]) ? r[TRAIL_DOMAINS_KEY] : []
+  }
+  try { return JSON.parse(localStorage.getItem(TRAIL_DOMAINS_KEY) || "[]") }
+  catch { return [] }
+}
+async function writeTrailDomains(domains) {
+  if (hasChrome) await chrome.storage.local.set({ [TRAIL_DOMAINS_KEY]: domains })
+  else localStorage.setItem(TRAIL_DOMAINS_KEY, JSON.stringify(domains))
+}
+function normalizeSavedDomain(item) {
+  const domain = normalizeDomain(typeof item === "string" ? item : item?.domain || item?.url || "")
+  if (!domain) return null
+  const status = typeof item === "object" && ["stored", "productive", "distraction"].includes(item?.status)
+    ? item.status
+    : "productive"
+  return { domain, status }
+}
+function normalizeDomain(value) {
+  const trimmed = value.trim().toLowerCase()
+  if (!trimmed) return ""
+  try {
+    return new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`).hostname.replace(/^www\./, "")
+  } catch {
+    return trimmed.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")
+  }
+}
+function createTrailTab(domain, status = "stored") {
+  return {
+    id: `domain:${domain}`,
+    title: domain,
+    url: domain,
+    contributing: status === "stored" ? null : status === "productive",
+    savedDomain: true,
+    domainStatus: status,
+    visits: 0,
+    secondsOn: 0,
+    friction: 0.1
+  }
 }
 
 // ---- Math ----
@@ -364,6 +407,38 @@ function IndexPopup() {
         setIsCustom(false)
       }
     })
+    readTrailDomains().then((savedDomains) => {
+      if (!mounted || savedDomains.length === 0) return
+      const savedEntries = savedDomains
+        .map(normalizeSavedDomain)
+        .filter(Boolean)
+        .filter((entry, index, entries) =>
+          entries.findIndex((other) => other.domain === entry.domain) === index
+        )
+      if (savedEntries.length === 0) return
+
+      setTabs((currentTabs) => {
+        const saved = new Map(savedEntries.map((entry) => [entry.domain, entry.status]))
+        const existing = new Set(currentTabs.map((tab) => normalizeDomain(tab.url)))
+        const restoredTabs = currentTabs.map((tab) =>
+          saved.has(normalizeDomain(tab.url))
+            ? {
+                ...tab,
+                contributing: saved.get(normalizeDomain(tab.url)) === "stored"
+                  ? null
+                  : saved.get(normalizeDomain(tab.url)) === "productive",
+                savedDomain: true,
+                domainStatus: saved.get(normalizeDomain(tab.url))
+              }
+            : tab
+        )
+        const newTabs = savedEntries
+          .filter((entry) => !existing.has(entry.domain))
+          .map((entry) => createTrailTab(entry.domain, entry.status))
+
+        return newTabs.length > 0 ? [...restoredTabs, ...newTabs] : restoredTabs
+      })
+    })
     const sync = async () => {
       const s = await readStore()
       if (!mounted) return
@@ -542,8 +617,9 @@ function IndexPopup() {
   }
   const pickQuest = (q, e) => { setActiveQuest(q); triggerReward(e) }
 
-  const contributingTabs = tabs.filter((t) => t.contributing)
-  const sideQuestTabs    = tabs.filter((t) => !t.contributing)
+  const savedDomainTabs = tabs.filter((t) => t.savedDomain && t.domainStatus === "stored")
+  const contributingTabs = tabs.filter((t) => t.contributing === true)
+  const sideQuestTabs    = tabs.filter((t) => t.contributing === false)
   const totalContributingSecs = contributingTabs.reduce((sum, t) => sum + t.secondsOn, 0)
 
   const canStart =
@@ -587,16 +663,81 @@ function IndexPopup() {
     setTimer(null)
   }
 
+  const saveTrailTabs = (nextTabs) => {
+    const savedDomains = nextTabs
+      .filter((tab) => tab.savedDomain)
+      .map((tab) => ({
+        domain: normalizeDomain(tab.url),
+        status: tab.domainStatus || (tab.contributing ? "productive" : "distraction")
+      }))
+      .filter((entry) => entry.domain)
+      .filter((entry, index, entries) =>
+        entries.findIndex((other) => other.domain === entry.domain) === index
+      )
+    writeTrailDomains(savedDomains)
+  }
+
   const toggleContributing = (id) =>
-    setTabs((ts) => ts.map((t) => t.id === id ? { ...t, contributing: !t.contributing } : t))
+    setTabs((ts) => {
+      const nextTabs = ts.map((t) => {
+        if (t.id !== id) return t
+        const contributing = !t.contributing
+        return {
+          ...t,
+          contributing,
+          domainStatus: t.savedDomain ? (contributing ? "productive" : "distraction") : t.domainStatus
+        }
+      })
+      saveTrailTabs(nextTabs)
+      return nextTabs
+    })
   const addTrailDomain = () => {
-    const v = newDomain.trim(); if (!v) return
-    const cleaned = v.replace(/^https?:\/\//, "").replace(/\/$/, "")
-    setTabs((ts) => [...ts, {
-      id: Date.now(), title: cleaned, url: cleaned,
-      contributing: true, visits: 0, secondsOn: 0, friction: 0.1
-    }])
+    const cleaned = normalizeDomain(newDomain)
+    if (!cleaned) return
+    setTabs((ts) => {
+      const nextTabs = ts.some((t) => normalizeDomain(t.url) === cleaned)
+        ? ts.map((t) => normalizeDomain(t.url) === cleaned
+          ? { ...t, contributing: null, savedDomain: true, domainStatus: "stored" }
+          : t)
+        : [...ts, createTrailTab(cleaned, "stored")]
+      saveTrailTabs(nextTabs)
+      return nextTabs
+    })
     setNewDomain("")
+  }
+  const classifySavedDomain = (id, status) => {
+    setTabs((ts) => {
+      const nextTabs = ts.map((t) => t.id === id
+        ? {
+            ...t,
+            contributing: status === "productive",
+            domainStatus: status
+          }
+        : t)
+      saveTrailTabs(nextTabs)
+      return nextTabs
+    })
+  }
+  const moveSavedDomainToStored = (id) => {
+    setTabs((ts) => {
+      const nextTabs = ts.map((t) => t.id === id
+        ? { ...t, contributing: null, domainStatus: "stored" }
+        : t)
+      saveTrailTabs(nextTabs)
+      return nextTabs
+    })
+  }
+  const deleteSavedDomain = (id) => {
+    setTabs((ts) => {
+      const nextTabs = ts.flatMap((t) => {
+        if (t.id !== id) return [t]
+        return String(t.id).startsWith("domain:")
+          ? []
+          : [{ ...t, savedDomain: false, domainStatus: undefined, contributing: false }]
+      })
+      saveTrailTabs(nextTabs)
+      return nextTabs
+    })
   }
   const brainDump = () => {
     setSavedCount((c) => c + sideQuestTabs.length)
@@ -854,6 +995,44 @@ function IndexPopup() {
               </div>
 
               <div className="scroll-y flex-1 min-h-0 pr-1">
+                {savedDomainTabs.length > 0 && (
+                  <>
+                    <div className="text-sm font-bold text-[#4F46E5] mb-[3px] tracking-[0.5px]">
+                      STORED DOMAINS
+                    </div>
+                    {savedDomainTabs.map((t) => (
+                      <div key={`stored-${t.id}`} className="tab-row">
+                        <div className="flex-1 overflow-hidden">
+                          <div className="truncate font-semibold text-base">{t.title}</div>
+                          <div className="text-[0.875rem] opacity-60 truncate">{t.url}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => classifySavedDomain(t.id, "productive")}
+                          title="Add to productive"
+                          className={`border-0 rounded-md px-2 py-1 text-xs font-bold cursor-pointer ${t.domainStatus === "productive" ? "bg-[#059669] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+                          Productive
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => classifySavedDomain(t.id, "distraction")}
+                          title="Add to distractions"
+                          className={`border-0 rounded-md px-2 py-1 text-xs font-bold cursor-pointer ${t.domainStatus === "distraction" ? "bg-[#DC2626] text-white" : "bg-black/[0.06] text-[#1F2937]"}`}>
+                          Distraction
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteSavedDomain(t.id)}
+                          title="Delete domain"
+                          aria-label={`Delete ${t.url}`}
+                          className="border-0 rounded-md px-2 py-1 text-sm font-bold cursor-pointer bg-black/[0.06] text-[#1F2937]">
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 <div className="text-sm font-bold text-[#059669] mb-[3px] tracking-[0.5px]">
                   ✓ PRODUCTIVE TABS · {formatTime(totalContributingSecs)} invested
                 </div>
@@ -864,8 +1043,6 @@ function IndexPopup() {
                 )}
                 {contributingTabs.map((t) => (
                   <div key={t.id} className="tab-row tab-contrib">
-                    <input type="checkbox" checked={t.contributing}
-                      onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                     <div className="flex-1 overflow-hidden">
                       <div className="truncate font-semibold text-base">{t.title}</div>
                       <div className="text-[0.875rem] opacity-60 flex gap-1.5">
@@ -874,6 +1051,16 @@ function IndexPopup() {
                         <span>{formatTime(t.secondsOn)}</span>
                       </div>
                     </div>
+                    {t.savedDomain && (
+                      <button
+                        type="button"
+                        onClick={() => moveSavedDomainToStored(t.id)}
+                        title="Move back to stored domains"
+                        aria-label={`Move ${t.url} back to stored domains`}
+                        className="border-0 rounded-md px-2 py-1 text-sm font-bold cursor-pointer bg-black/[0.06] text-[#1F2937]">
+                        ↑
+                      </button>
+                    )}
                   </div>
                 ))}
 
@@ -884,8 +1071,6 @@ function IndexPopup() {
                     </div>
                     {sideQuestTabs.map((t) => (
                       <div key={t.id} className="tab-row tab-side">
-                        <input type="checkbox" checked={t.contributing}
-                          onChange={() => toggleContributing(t.id)} className="cursor-pointer"/>
                         <div className="flex-1 overflow-hidden">
                           <div className="truncate text-base font-semibold">{t.title}</div>
                           <div className="text-[0.875rem] opacity-60 flex gap-1.5">
@@ -894,6 +1079,16 @@ function IndexPopup() {
                             <span>{formatTime(t.secondsOn)}</span>
                           </div>
                         </div>
+                        {t.savedDomain && (
+                          <button
+                            type="button"
+                            onClick={() => moveSavedDomainToStored(t.id)}
+                            title="Move back to stored domains"
+                            aria-label={`Move ${t.url} back to stored domains`}
+                            className="border-0 rounded-md px-2 py-1 text-sm font-bold cursor-pointer bg-black/[0.06] text-[#1F2937]">
+                            ↑
+                          </button>
+                        )}
                       </div>
                     ))}
                   </>
